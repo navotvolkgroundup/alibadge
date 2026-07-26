@@ -253,8 +253,12 @@
       $('[data-mk]').textContent = '·····';
       $('[data-mk]').classList.add('pending');
       $('[data-ali]').textContent = 'found on AliExpress';
-      $('[data-sub]').textContent = 'no confident price match';
-      console.log('[alibadge] link-only —', (verdict.reasons || []).join(', '));
+      const why = (verdict.reasons || []).join(', ');
+      // Put the reason ON the badge in debug builds. Silence-as-default means the
+      // console is the only failure signal, and hunting for one line in a merchant
+      // page's console is a miserable way to find it.
+      $('[data-sub]').textContent = debug && why ? why : 'no confident price match';
+      console.log('[alibadge] link-only —', why);
     } else {
       $('[data-mk]').textContent = '+' + verdict.markup + '%';
       $('[data-mk]').classList.remove('pending');
