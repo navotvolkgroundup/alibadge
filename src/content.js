@@ -177,11 +177,17 @@
     teardown();
     const host = document.createElement('div');
     host.id = 'alibadge-root';
+    // `all:initial` MUST come first: it resets every property, so anything declared
+    // before it is wiped. With it last, position/bottom/z-index were all reset to
+    // static and the badge silently rendered at the end of <body> instead of
+    // pinned — visible only if you scrolled to the very bottom of the page.
+    //
     // Not bottom-right: nearly every Shopify store puts a chat widget there.
     // Logical properties so RTL mirrors automatically (Hebrew stores exist).
     host.style.cssText =
-      'position:fixed;bottom:20px;inset-inline-start:20px;z-index:2147483000;' +
-      'all:initial;contain:layout style;';
+      'all:initial;' +
+      'position:fixed !important;bottom:20px !important;inset-inline-start:20px !important;' +
+      'z-index:2147483000 !important;contain:layout style;';
     const root = host.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>
       :host{all:initial}
