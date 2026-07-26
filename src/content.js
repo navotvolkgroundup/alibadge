@@ -304,11 +304,10 @@
         aliUrl: v.aliUrl,
         sold: v.sold,
         markup: v.markup,
-        // Printed on the receipt rather than implied. Today the results API gives
-        // one price per listing and it is the listing's LOWEST variant, which
-        // inflates the ratio — so say so, and change this string when the
-        // conservative dearest-variant lookup lands.
-        priceBasis: 'matched listing, lowest variant',
+        // Printed on the receipt rather than implied. The worker re-prices the
+        // winner via pdp.pc.query and takes the DEAREST variant, the conservative
+        // direction, so this string is now literally true.
+        priceBasis: 'matched listing, dearest variant',
         shipTo: v.shipTo,
         capturedAt: v.capturedAt,
       });
@@ -341,7 +340,7 @@
       storePrice: extraction.price, currency: extraction.currency,
       storeImage: extraction.image, aliTitle: v.aliTitle, aliPrice: v.aliPrice,
       aliImage: v.aliImage, aliUrl: v.aliUrl, sold: v.sold, markup: v.markup,
-      priceBasis: 'matched listing, lowest variant',
+      priceBasis: 'matched listing, dearest variant',
       shipTo: v.shipTo, capturedAt: v.capturedAt,
     };
   }

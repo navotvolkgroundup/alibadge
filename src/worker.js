@@ -94,14 +94,15 @@ async function cachePut(keys, v) {
 // the token is the part before the "_". `recom-acs` does NOT skip this — verified
 // against a live call, contrary to an earlier note in the design doc. Reading the
 // cookie is why the `cookies` permission is required after all.
-async function mtopToken() {
+async function tokenFor(host) {
   try {
-    const c = await chrome.cookies.get({ url: UPLOAD_HOST, name: '_m_h5_tk' });
+    const c = await chrome.cookies.get({ url: host, name: '_m_h5_tk' });
     return c && c.value ? c.value.split('_')[0] : null;
   } catch {
     return null;
   }
 }
+const mtopToken = () => tokenFor(UPLOAD_HOST);
 
 async function mtopCall(data, token) {
   const t = Date.now();
@@ -151,6 +152,56 @@ async function uploadImage(b64, currency) {
   const fileId = j && j.data && j.data.fileId;
   log('upload', j && j.ret, fileId ? 'ok' : 'no fileId');
   return fileId || null;
+}
+
+// --- AliExpress: authoritative price in a chosen currency --------------------
+// The results endpoint returns whatever currency the caller's geo implies (ILS
+// here), which decide() rightly refuses to compare against a USD store price.
+// pdp.pc.query DOES honour _currency per call, so it is the price source.
+// Different appKey and its own handshake.
+const PDP_API = 'mtop.aliexpress.pdp.pc.query';
+const PDP_APPKEY = '12574478';
+const PDP_HOST = 'https://acs.aliexpress.com';
+
+async function pdpCall(data, token) {
+  const t = Date.now();
+  const sign = md5([token || '', t, PDP_APPKEY, data].join('&'));
+  const qs = new URLSearchParams({
+    jsv: '2.5.1', appKey: PDP_APPKEY, t: String(t), sign,
+    api: PDP_API, v: '1.0', type: 'originaljson', dataType: 'json', timeout: '15000',
+  });
+  const res = await fetch(`${PDP_HOST}/h5/${PDP_API}/1.0/?${qs}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(data),
+  });
+  return res.json().catch(() => null);
+}
+
+async function pdpPrice(productId, currency) {
+  const data = JSON.stringify({
+    productId: String(productId), _lang: 'en_US', _currency: currency, country: SHIP_TO,
+    province: '', city: '', channel: '', pdp_ext_f: '', pdpNPI: '', sourceType: '',
+    clientType: 'pc',
+    ext: JSON.stringify({ site: 'glo', crawler: false, signedIn: false, host: 'www.aliexpress.com' }),
+  });
+  try {
+    let j = await pdpCall(data, await tokenFor(PDP_HOST));
+    if (j && String(j.ret).includes('TOKEN_EMPTY')) j = await pdpCall(data, await tokenFor(PDP_HOST));
+    const s = JSON.stringify(j || {});
+    const nums = [...s.matchAll(/"formatedAmount"\s*:\s*"[^\d"]*([\d.,]+)"/g)]
+      .map((m) => parseFloat(m[1].replace(/,/g, '')))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (!nums.length) return null;
+    // DEAREST variant, deliberately. A listing spans 1pc to 24pc, and the cheapest
+    // end inflates the ratio — measured, that choice flipped the badge verdict on
+    // 3 of 10 products. Conservative is the only defensible direction on an
+    // artifact that names a merchant.
+    return Math.max(...nums);
+  } catch {
+    return null;
+  }
 }
 
 // --- AliExpress: results -----------------------------------------------------
@@ -287,10 +338,27 @@ async function lookup(extraction, pageOrigin) {
     }
     throw e;
   }
+  // Re-price the top candidates in the STORE's currency. Without this the results
+  // arrive in the caller's geo currency and decide() correctly refuses to compare
+  // across currencies — which is exactly the currency_mismatch that blocked every
+  // badge from showing a number.
+  let priced = results;
+  if (results.length && extraction.currency) {
+    const head = results.slice(0, 3);
+    const fixed = await Promise.all(head.map(async (r) => {
+      if (r.currency === extraction.currency) return r;
+      const p = await pdpPrice(r.productId, extraction.currency);
+      return p == null ? null : { ...r, price: p, currency: extraction.currency };
+    }));
+    const ok = fixed.filter(Boolean);
+    if (ok.length) priced = ok.concat(results.slice(3));
+    log(`repriced ${ok.length}/${head.length} into ${extraction.currency}`);
+  }
+
   // ponytail: no perceptual hash yet — AliExpress's own result rank IS a visual
   // similarity signal, and the brand guard + markup floor still gate. Add
   // blockhash when rank measurably admits wrong matches.
-  const verdict = decide(extraction, results, null);
+  const verdict = decide(extraction, priced, null);
 
   const out = {
     render: verdict.render,
