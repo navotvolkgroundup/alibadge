@@ -205,6 +205,12 @@
       .acts{display:flex;gap:10px;align-items:center;margin-top:2px}
       button{all:unset;cursor:pointer;font:inherit;font-size:11px;color:#9b938b;
              border-bottom:1px dotted #5a534c}
+      /* all:unset above resets display too, which clobbers the [hidden]
+         attribute's display:none, so "copy receipt" showed in the link-only state
+         where there is no number to put on a receipt. Same class of bug as the
+         all:initial ordering one. (No backticks in here: this CSS lives inside a
+         template literal.) */
+      [hidden]{display:none !important}
       button:hover{color:#f6f4f1}
       :is(a,button):focus-visible{outline:2px solid #8fc7ff;outline-offset:2px}
       .x{position:absolute;top:4px;inset-inline-end:6px;font-size:14px;color:#6f6862;
