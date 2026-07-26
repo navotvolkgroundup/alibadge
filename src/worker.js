@@ -17,6 +17,9 @@ const RESULTS_LOCALE = 'https://www.aliexpress.com';
 const SHIP_TO = 'US';      // pinned, disclosed on the receipt so a third party can reproduce
 const CURRENCY = 'USD';    // ditto — NOT derived from locale
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Bump to invalidate every existing entry. Needed once already: failures were
+// being cached, so a transient no_results outlived the fix for it.
+const CACHE_V = 'v2';
 const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
 const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
 const HOURLY_CAP = 120;
@@ -62,9 +65,9 @@ async function sha256(buf) {
 }
 
 async function cacheGet(keys) {
-  const got = await chrome.storage.local.get(keys.map((k) => 'c:' + k));
+  const got = await chrome.storage.local.get(keys.map((k) => `c:${CACHE_V}:${k}`));
   for (const k of keys) {
-    const hit = got['c:' + k];
+    const hit = got[`c:${CACHE_V}:${k}`];
     if (hit && Date.now() - hit.t < CACHE_TTL_MS) return hit.v;
   }
   return null;
@@ -73,7 +76,7 @@ async function cacheGet(keys) {
 async function cachePut(keys, v) {
   const rec = { t: Date.now(), v };
   const put = {};
-  for (const k of keys) put['c:' + k] = rec;
+  for (const k of keys) put[`c:${CACHE_V}:${k}`] = rec;
   await chrome.storage.local.set(put);
   const all = await chrome.storage.local.get(null);
   const entries = Object.entries(all).filter(([k]) => k.startsWith('c:'));
@@ -315,7 +318,17 @@ async function lookup(extraction, pageOrigin) {
     });
   }
   log('verdict', out.render, out.reasons);
-  await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], out);
+  // NEVER cache a transient failure. A verdict is only cacheable when the same
+  // inputs would produce it again: a decision (floor, brand guard, currency) is
+  // stable; a network failure is not. Caching the latter turned one bad minute
+  // into a week of silence and hid the fix for it.
+  const TRANSIENT = /^(no_results|punished|rate_capped|upload_failed|image_fetch_failed|worker_error|results_http_)/;
+  const cacheable = !(out.reasons || []).some((r) => TRANSIENT.test(r));
+  if (cacheable) {
+    await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], out);
+  } else {
+    log('not caching transient verdict:', (out.reasons || []).join(', '));
+  }
   return out;
 }
 
