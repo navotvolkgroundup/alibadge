@@ -6,6 +6,7 @@ import {
   parsePrice, parseShopifyCents, isAllowedImageUrl, absoluteFloor, brandGuard,
   decide, pickWinner, urlCacheKey, markupPercent, md5,
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
+  vendorMismatch,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -219,26 +220,34 @@ test('md5 handles the separators the MTOP sign string is built from', () => {
 
 // The measured false accusation: a real Otterbox case on a legitimate 15-branch
 // Israeli retailer, matched against a generic AliExpress case at 6.7x.
-test('brandGuard rejects a declared vendor the listing never names', () => {
+test('vendorMismatch flags a declared vendor the listing never names', () => {
   const args = {
     storePrice: 299, aliPrice: 44.6, storeHost: 'i-cell.co.il',
     title: 'כיסוי Otterbox ל iPad Air 11"',
     aliTitle: 'Shockproof Folio Case for iPad Air 11 inch Tablet Cover',
   };
-  expect(brandGuard({ ...args, vendor: 'Otterbox' })).toContain('vendor_mismatch');
-  // Same listing, but the marketplace item IS an Otterbox: no trip.
-  expect(brandGuard({
-    ...args, vendor: 'Otterbox',
-    aliTitle: 'Original OtterBox Symmetry Folio for iPad Air 11',
-  })).not.toContain('vendor_mismatch');
+  expect(vendorMismatch('Otterbox', args.storeHost, args.aliTitle)).toBe(true);
+  // Same listing, but the marketplace item IS an Otterbox: nothing to say.
+  expect(vendorMismatch('Otterbox', args.storeHost,
+    'Original OtterBox Symmetry Folio for iPad Air 11')).toBe(false);
 });
 
-test('brandGuard ignores a vendor that is just the shop name', () => {
-  // Dropshippers set vendor to themselves; tripping here would mute the extension
-  // on exactly the stores it exists to find.
-  expect(brandGuard({
-    storePrice: 84.95, aliPrice: 9.72, storeHost: 'www.warmlydecor.com',
-    vendor: 'WarmlyDecor', title: 'Vintage Cutlery Set',
-    aliTitle: 'Luxury Gold Stainless Steel Cutlery Set 24pc',
-  })).toEqual([]);
+test('vendorMismatch ignores a vendor that is just the shop name', () => {
+  // Dropshippers set vendor to themselves; flagging that would put a meaningless
+  // caveat on exactly the stores this exists to find.
+  expect(vendorMismatch('WarmlyDecor', 'www.warmlydecor.com',
+    'Luxury Gold Stainless Steel Cutlery Set 24pc')).toBe(false);
+});
+
+test('a branded mismatch still renders full, carrying the caveat', () => {
+  // The measured i-cell case: suppressing it threw away a true find.
+  const v = decide(
+    { price: 299, currency: 'ILS', host: 'i-cell.co.il', vendor: 'Otterbox',
+      title: 'כיסוי Otterbox ל iPad Air 11"' },
+    [{ price: '₪44.60', currency: 'ILS', title: 'Shockproof Folio Case for iPad Air 11',
+       url: 'https://x', image: 'https://y' }],
+    null,
+  );
+  expect(v.render).toBe('full');
+  expect(v.note).toBe('listing does not name Otterbox');
 });

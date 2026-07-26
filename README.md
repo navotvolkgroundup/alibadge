@@ -80,11 +80,12 @@ with prices and sold counts.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
   own `history`, so the patch never intercepts the page, and `replaceState` (which Shopify
   variant switching uses) never fires `popstate`.
-- **The brand list is not the brand guard.** `KNOWN_BRAND_TOKENS` is unbounded by
-  construction — measured, a real Otterbox case on a legitimate 15-branch Israeli
-  retailer rendered +570% because the list held `apple` but not `otterbox`. The load-
-  bearing check is `vendor_mismatch`: the store declares its own brand in
-  `product.vendor`, and a listing that never names that brand is a different product.
+- **A brand mismatch is a NOTE, not a guard.** When the store declares
+  `product.vendor: Otterbox` and the matched listing never says Otterbox, the badge
+  still renders the number and prints `listing does not name Otterbox` beside it.
+  Suppressing it was tried and thrown out: it discards a true find (the same case,
+  far cheaper) to avoid an assertion the caveat already prevents. `note` travels onto
+  the receipt for the same reason — the artifact is what gets posted.
 - **The brand-guard ceiling is conditional on absolute price.** A $2 item at 36× is
   ordinary dropshipping; a $200 item at 36× suggests a counterfeit. An unconditioned 15×
   ceiling suppresses the genuine dropshippers this exists to find.

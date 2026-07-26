@@ -285,8 +285,12 @@
       const cur = verdict.aliCurrency === 'USD' ? '$' : '';
       $('[data-ali]').textContent = `${cur}${verdict.aliPrice} on AliExpress`;
       console.log('[alibadge] FULL — markup +' + verdict.markup + '%');
-      $('[data-sub]').textContent =
-        `excludes shipping · ${verdict.shipTo}/${verdict.aliCurrency} · ${verdict.capturedAt}`;
+      // The caveat rides WITH the number. A brand the listing never names is the
+      // most useful thing on the badge when it happens — and it is what stops
+      // "+570%" from quietly asserting the two are the same branded product.
+      $('[data-sub]').textContent = verdict.note
+        ? `${verdict.note} · excludes shipping · ${verdict.capturedAt}`
+        : `excludes shipping · ${verdict.shipTo}/${verdict.aliCurrency} · ${verdict.capturedAt}`;
       $('[data-copy]').hidden = false;
       $('[data-copy]').onclick = () => copyReceipt(extraction, verdict, $);
     }
@@ -312,25 +316,7 @@
     };
     btn.textContent = 'rendering…';
     try {
-      const blob = await AliBadgeReceipt.render({
-        storeHost: extraction.host,
-        storeTitle: extraction.title,
-        storePrice: extraction.price,
-        currency: extraction.currency,
-        storeImage: extraction.image,
-        aliTitle: v.aliTitle,
-        aliPrice: v.aliPrice,
-        aliImage: v.aliImage,
-        aliUrl: v.aliUrl,
-        sold: v.sold,
-        markup: v.markup,
-        // Printed on the receipt rather than implied. The worker re-prices the
-        // winner via pdp.pc.query and takes the DEAREST variant, the conservative
-        // direction, so this string is now literally true.
-        priceBasis: 'matched listing, dearest variant',
-        shipTo: v.shipTo,
-        capturedAt: v.capturedAt,
-      });
+      const blob = await AliBadgeReceipt.render(receiptData(extraction, v));
       if (!blob) return done('render failed');
 
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -361,6 +347,7 @@
       storeImage: extraction.image, aliTitle: v.aliTitle, aliPrice: v.aliPrice,
       aliImage: v.aliImage, aliUrl: v.aliUrl, sold: v.sold, markup: v.markup,
       priceBasis: 'matched listing, dearest variant',
+      note: v.note || null,
       shipTo: v.shipTo, capturedAt: v.capturedAt,
     };
   }

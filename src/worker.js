@@ -382,6 +382,7 @@ async function judge(extraction, found) {
   const out = {
     render: verdict.render,
     reasons: verdict.reasons,
+    note: verdict.note || null,
     searchUrl: `https://www.aliexpress.com/w/wholesale-.html?isNewImageSearch=y&filename=${encodeURIComponent(fileId)}`,
   };
   if (verdict.winner) {

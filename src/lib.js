@@ -94,9 +94,12 @@ const KNOWN_BRAND_TOKENS = [
 // the list happened to contain 'apple' but not 'otterbox'. There is no version of
 // that list that contains every brand.
 //
-// If the store says "Otterbox" and the matched listing never says "Otterbox", they
-// are not the same product, whatever the photo similarity says.
-function vendorMismatch(vendor, storeHost, aliTitle) {
+// If the store says "Otterbox" and the matched listing never says "Otterbox", that
+// is worth PRINTING, not suppressing. Suppressing it throws away a true find — the
+// same case, far cheaper — and the doc's own worry (never assert two things are the
+// same branded product when they may not be) is answered by saying so on the badge.
+// So this returns a note, not a guard trip.
+export function vendorMismatch(vendor, storeHost, aliTitle) {
   const v = String(vendor || '').trim().toLowerCase();
   // Dropshippers routinely set vendor to their own shop name, which would mismatch
   // every listing and mute the extension on exactly the stores it exists to find.
@@ -105,14 +108,9 @@ function vendorMismatch(vendor, storeHost, aliTitle) {
   return !String(aliTitle || '').toLowerCase().includes(v);
 }
 
-export function brandGuard({
-  storePrice, aliPrice, title = '', storeHost = '', resultPrices = [],
-  vendor = '', aliTitle = '',
-}) {
+export function brandGuard({ storePrice, aliPrice, title = '', storeHost = '', resultPrices = [] }) {
   const reasons = [];
   const ratio = storePrice / aliPrice;
-
-  if (vendorMismatch(vendor, storeHost, aliTitle)) reasons.push('vendor_mismatch');
 
   // Implausible gap on a non-trivial marketplace price suggests a counterfeit of a
   // real brand, not a dropshipper's markup.
@@ -168,16 +166,20 @@ export function decide(extraction, results, gate) {
     title: extraction.title,
     storeHost: extraction.host,
     resultPrices: results.map((r) => parsePrice(r.price)).filter(Boolean),
-    vendor: extraction.vendor,
-    aliTitle: winner.title,
   });
 
   // A guard trip means we may be looking at a legitimate brand being counterfeited.
   // Say nothing at all rather than linking, which would still imply something.
   if (guard.length) return { render: 'none', winner, reasons: [...reasons, ...guard] };
 
-  if (reasons.length) return { render: 'link-only', winner, reasons };
-  return { render: 'full', winner, reasons: [] };
+  // Not a reason — reasons downgrade the render. This rides along with a full
+  // badge so the number still shows and the caveat shows with it.
+  const note = vendorMismatch(extraction.vendor, extraction.host, winner.title)
+    ? `listing does not name ${extraction.vendor}`
+    : null;
+
+  if (reasons.length) return { render: 'link-only', winner, reasons, note };
+  return { render: 'full', winner, reasons: [], note };
 }
 
 // Lowest Hamming distance wins; on ties the HIGHER price wins. Never "cheapest

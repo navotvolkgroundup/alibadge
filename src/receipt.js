@@ -197,9 +197,11 @@ var AliBadgeReceipt = (() => {
       g.fillStyle = C.accent;
       g.fillText(Math.round((d.storePrice / d.aliPrice) * 10) / 10 + '×', px + 20, TOP + 190);
     }
+    // The caveat is printed on the artifact, not just the badge: the receipt is
+    // what gets posted, so anything qualifying the number has to travel with it.
     g.font = f(11);
-    g.fillStyle = C.dim;
-    g.fillText('excludes shipping', px + 20, TOP + COL_H - 20);
+    g.fillStyle = d.note ? C.accent : C.dim;
+    g.fillText(ellipsize(g, d.note || 'excludes shipping', pw - 40), px + 20, TOP + COL_H - 20);
 
     // --- the three numbers: ONE store price, ONE compared price ---------------
     // Deliberately three cells, not rows per variant: the store has a single price
