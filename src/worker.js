@@ -26,6 +26,7 @@ const HOURLY_CAP = 120;
 let debug = true;
 chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false));
 const log = (...a) => debug && console.log('[alibadge]', ...a);
+console.log('[alibadge] worker alive');
 
 // --- serial queue + token bucket --------------------------------------------
 // A serial queue alone does not limit requests per minute, which is what the
@@ -115,7 +116,7 @@ async function mtopCall(data, token) {
   return res.json().catch(() => null);
 }
 
-async function uploadImage(b64) {
+async function uploadImage(b64, currency) {
   const params = {
     appId: UPLOAD_APPID,
     isNewImageSearch: true,
@@ -128,7 +129,10 @@ async function uploadImage(b64) {
     contentType: 'imageUpload',
     image_base64: b64,
     shpt_co: SHIP_TO,
-    _currency: CURRENCY,
+    // Follow the STORE's presentment currency: correctness beats a pinned
+    // constant, and whatever was used is stamped on the receipt, so it stays
+    // reproducible by a third party either way.
+    _currency: currency || CURRENCY,
     sortType: 'default',
     sortOrder: 'default',
     timeout: 50000,
@@ -214,7 +218,7 @@ async function lookup(extraction, pageOrigin) {
   }
   const b64 = btoa(bin);
 
-  const fileId = await uploadImage(b64);
+  const fileId = await uploadImage(b64, extraction.currency);
   // Nothing renders before a fileId exists: it is both the evidence that the
   // search ran and the only thing a results link can be built from.
   if (!fileId) return { render: 'none', reasons: ['upload_failed'] };
@@ -248,7 +252,7 @@ async function lookup(extraction, pageOrigin) {
     const ali = parsePrice(verdict.winner.price);
     Object.assign(out, {
       aliPrice: ali,
-      aliCurrency: verdict.winner.currency || CURRENCY,
+      aliCurrency: verdict.winner.currency || extraction.currency || CURRENCY,
       aliUrl: verdict.winner.url,
       aliTitle: verdict.winner.title,
       aliImage: verdict.winner.image,

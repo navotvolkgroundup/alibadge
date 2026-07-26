@@ -10,6 +10,9 @@
   let debug = true; // see worker.js — on by default for unpacked builds
   chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false));
   const log = (...a) => debug && console.log('[alibadge]', ...a);
+  // Unconditional: absence of this line in the PAGE console proves the content
+  // script never injected, which is a completely different problem from a skip.
+  console.log('[alibadge] content script alive on', location.host + location.pathname);
 
   const ask = (msg) =>
     new Promise((resolve) => {
@@ -37,6 +40,20 @@
   function isShopify() {
     if (document.querySelector('meta[id="shopify-digital-wallet"]')) return true;
     return !!document.querySelector('img[src*="cdn.shopify.com"], link[href*="cdn.shopify.com"]');
+  }
+
+  // Shopify Markets serves a presentment currency on the page while /products/x.js
+  // can still return the shop's DEFAULT currency (measured on warmlydecor: JSON
+  // 8495 = $84.95, page shows ₪259.00, and the JSON has no `currency` field at
+  // all). The price on screen is definitionally what the shopper pays, so the DOM
+  // is the source of truth and the JSON supplies the image and variant.
+  const SYMBOLS = [
+    [/₪|NIS|ILS/i, 'ILS'], [/€|EUR/i, 'EUR'], [/£|GBP/i, 'GBP'],
+    [/C\$|CAD/i, 'CAD'], [/A\$|AUD/i, 'AUD'], [/¥|JPY/, 'JPY'], [/\$|USD/i, 'USD'],
+  ];
+  function currencyFrom(text) {
+    for (const [re, code] of SYMBOLS) if (re.test(text)) return code;
+    return null;
   }
 
   function domPriceText() {
@@ -92,12 +109,36 @@
       (document.querySelector('form[action*="/cart"] [name="currency"]') || {}).value ||
       null;
 
+    let finalPrice = price;
+    let finalCurrency = currency;
+
     const domTxt = domPriceText();
     if (domTxt) {
       const seen = numbersIn(domTxt);
-      const ok = seen.some((n) => Math.abs(n - price) < Math.max(0.02, price * 0.02));
-      if (!ok) return { skip: 'dom_price_mismatch', detail: { price, domTxt } };
+      const domCur = currencyFrom(domTxt);
+      // MIN, not max: a price block showing both compare-at and sale prices lists
+      // the higher struck-through figure too, and the shopper pays the lower one.
+      // (Deliberately the opposite of the AliExpress rule, where max is the
+      // conservative choice because a range's low end is a 1-piece variant.)
+      const domPrice = seen.length ? Math.min(...seen) : null;
+      const agrees = domPrice != null && Math.abs(domPrice - price) < Math.max(0.02, price * 0.02);
+
+      if (domPrice != null && !agrees) {
+        // Disagreement is normal under Shopify Markets, not an error. Trust the
+        // screen. Bail only if the gap is absurd, which means we parsed junk.
+        const factor = domPrice / price;
+        if (factor > 100 || factor < 0.01) {
+          console.warn('[alibadge] price parse looks wrong — json', price, 'dom', domPrice);
+          return { skip: 'dom_price_implausible', detail: { price, domPrice, domTxt } };
+        }
+        finalPrice = domPrice;
+        finalCurrency = domCur || currency;
+        log('presentment currency in use:', finalPrice, finalCurrency, '(json had', price, ')');
+      } else if (agrees) {
+        finalCurrency = currency || domCur;
+      }
     }
+    if (!finalCurrency) return { skip: 'no_currency', detail: { price: finalPrice, domTxt } };
 
     const image = variant.featured_image?.src || p.images?.[0] || p.featured_image || null;
     if (!image) return { skip: 'no_image' };
@@ -106,8 +147,8 @@
       url: location.href,
       host: HOST,
       title: p.title || '',
-      price,
-      currency,
+      price: finalPrice,
+      currency: finalCurrency,
       image: image.startsWith('//') ? 'https:' + image : image,
     };
   }
@@ -244,7 +285,13 @@
 
     const extraction = await extract();
     if (gen !== generation) return;
-    if (extraction.skip) return log('skip:', extraction.skip, extraction.detail || '');
+    if (extraction.skip) {
+      // Unconditional: a skip is the difference between "working and silent" and
+      // "broken and silent", and those must never look the same.
+      console.log('[alibadge] SKIP:', extraction.skip, extraction.detail || '');
+      return;
+    }
+    console.log('[alibadge] extracted', extraction.price, extraction.currency, '→ asking worker');
 
     const verdict = await ask({ type: 'lookup', extraction });
     await render(gen, extraction, verdict);
