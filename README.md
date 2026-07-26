@@ -47,7 +47,11 @@ dark timeline, so the composition can be iterated without reloading the extensio
    appKey 24815441, on `recom-acs.aliexpress.com`. Returns a `fileId`.
 3. **Results** — `POST /fn/search-pc/index` with `{isNewImageSearch:"y", filename:<fileId>}`.
    Returns **60** items at `data.data.root.fields.mods.itemList.content`. Needs no cookies.
-4. **Decide** — `decide()` owns the render policy and returns all failing reasons.
+4. **Re-price** — the results endpoint returns whatever currency the caller's geo implies,
+   so the top 3 candidates go through `mtop.aliexpress.pdp.pc.query` (appKey 12574478, on
+   `acs.aliexpress.com`, its own handshake), which honours `_currency` per call. Takes the
+   DEAREST variant: the cheapest inflates the ratio, and measured it flipped 3 of 10 verdicts.
+5. **Decide** — `decide()` owns the render policy and returns all failing reasons.
 
 Verified live end-to-end on 2026-07-26: handshake → 180,488-char base64 upload → 60 items
 with prices and sold counts.
@@ -86,19 +90,10 @@ with prices and sold counts.
   returns a single price per listing, so there is no variant data to render. Omitted rather
   than invented, per the doc's own rule. Add it if the PDP lookup lands (it returns a full
   `skuPriceInfoMap`).
-- **Conservative variant pricing.** The receipt prints `based on matched listing, lowest
-  variant` because `salePrice.minPrice` is the cheapest variant, which INFLATES the markup.
-  The doc calls the dearest variant the conservative choice, and measured it flipped 3 of 10
-  verdicts. `smoke.js` shows the fix via `mtop.aliexpress.pdp.pc.query`. **This is the most
-  important open correctness item.**
 - **Perceptual hash gate (blockhash).** `decide()` takes a `gate` argument and currently
   gets `null`, falling back to AliExpress's own result rank — which is itself a visual
   similarity signal, with the brand guard and markup floor still gating. Add blockhash
   when rank measurably admits wrong matches.
-- **Currency normalisation across sources.** The results endpoint returns whatever
-  currency the caller's geo implies, so a USD store against ILS results correctly
-  degrades to link-only. `smoke.js` shows the fix: resolve the winner's price via
-  `mtop.aliexpress.pdp.pc.query`, which honours `_currency` per call.
 - **Playwright E2E**, both cases from the design doc — badge fires on a dropship fixture,
   and a hard-negative fixture asserting `decide().reasons` contains `brand_guard`. A
   DOM-absence assertion would pass with the guard deleted, so it must assert the reason.
