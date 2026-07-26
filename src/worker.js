@@ -153,14 +153,23 @@ async function uploadImage(b64, currency) {
 // --- AliExpress: results -----------------------------------------------------
 // Needs no cookies and no content-type. Returns 60 items; the rendered page only
 // shows 12, so never scrape the DOM for this.
-async function fetchResults(fileId) {
+async function fetchResults(fileId, attempt = 1) {
   const res = await fetch(`${RESULTS_LOCALE}/fn/search-pc/index`, {
     method: 'POST',
     credentials: 'omit',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ isNewImageSearch: 'y', filename: fileId, pageVersion: '', page: 1 }),
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    // 403 here means the app-layer Origin check rejected chrome-extension:// —
+    // measured: same request returns 60 items with an aliexpress Origin and 403
+    // with the extension's. rules.json rewrites it via declarativeNetRequest, so
+    // a 403 reaching this line means that rule is not applying.
+    log(`results: HTTP ${res.status}${res.status === 403 ? ' — Origin rewrite not applied?' : ''}`);
+    const e = new Error('http_' + res.status);
+    e.httpStatus = res.status;
+    throw e;
+  }
   const text = await res.text();
   // The wall returns HTTP 200 with an HTML redirect to _____tmd_____/punish, so
   // status alone never reveals it. Measured: this endpoint rate-punishes
@@ -175,10 +184,19 @@ async function fetchResults(fileId) {
   let j = null;
   try { j = JSON.parse(text); } catch {}
   const items = j?.data?.data?.root?.fields?.mods?.itemList?.content;
-  if (!Array.isArray(items)) {
-    log('results: schema changed or empty');
+  if (!Array.isArray(items) || !items.length) {
+    // A freshly minted fileId is not immediately visible to the search index —
+    // observed repeatedly: an empty item list right after upload that populates a
+    // couple of seconds later. Retry before giving up, or the badge silently loses
+    // to a race it would have won.
+    log(`results: empty (attempt ${attempt}, ${text.length}b, parsed=${!!j})`);
+    if (attempt < 4) {
+      await new Promise((r) => setTimeout(r, 1200 * attempt));
+      return fetchResults(fileId, attempt + 1);
+    }
     return [];
   }
+  log(`results: ${items.length} items (attempt ${attempt})`);
   return items.map((it) => ({
     productId: it.productId,
     title: it.title?.displayTitle || '',
@@ -227,12 +245,12 @@ async function lookup(extraction, pageOrigin) {
   try {
     results = await fetchResults(fileId);
   } catch (e) {
-    if (e && e.punished) {
+    if (e && (e.punished || e.httpStatus)) {
       // A fileId exists, so the search DID run — degrade to the link rather than
       // going silent, which is the whole point of the link-only state.
       return {
         render: 'link-only',
-        reasons: ['punished'],
+        reasons: [e.punished ? 'punished' : 'results_http_' + e.httpStatus],
         searchUrl: `https://www.aliexpress.com/w/wholesale-.html?isNewImageSearch=y&filename=${encodeURIComponent(fileId)}`,
       };
     }

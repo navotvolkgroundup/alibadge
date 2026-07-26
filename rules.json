@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "modifyHeaders",
+      "requestHeaders": [
+        { "header": "origin", "operation": "set", "value": "https://www.aliexpress.com" },
+        { "header": "referer", "operation": "set", "value": "https://www.aliexpress.com/" }
+      ]
+    },
+    "condition": {
+      "urlFilter": "||aliexpress.com/fn/search-pc/index",
+      "resourceTypes": ["xmlhttprequest", "other"]
+    }
+  }
+]

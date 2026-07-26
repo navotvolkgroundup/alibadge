@@ -29,6 +29,16 @@
   "permissions": [
     "storage",
     "clipboardWrite",
-    "cookies"
-  ]
+    "cookies",
+    "declarativeNetRequestWithHostAccess"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "aliexpress-origin",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  }
 }
