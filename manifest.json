@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "AliBadge",
+  "version": "0.1.0",
+  "description": "Shows the AliExpress price of the product page you're looking at.",
+  "background": {
+    "service_worker": "src/worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*/*"
+      ],
+      "exclude_matches": [
+        "*://*.aliexpress.com/*",
+        "*://*.alicdn.com/*",
+        "*://*.aliexpress-media.com/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "permissions": [
+    "storage",
+    "clipboardWrite",
+    "cookies"
+  ]
+}
