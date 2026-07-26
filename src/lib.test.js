@@ -113,6 +113,9 @@ test('brand guard vetoes known brand tokens in title or host', () => {
   expect(knownBrandIn('Stanley Quencher 40oz', '')).toBe('stanley');
   expect(knownBrandIn('Tumbler', 'shop.yeti.com')).toBe('yeti');
   expect(knownBrandIn('Vintage Cutlery Set', 'warmlydecor.com')).toBe(null);
+  // The token that started this: absent from the list, it produced no caveat at all
+  // on a page whose only brand signal is the title.
+  expect(knownBrandIn('כיסוי Otterbox ל iPad Air 11', 'i-cell.co.il')).toBe('otterbox');
 });
 
 test('brand guard vetoes extreme price dispersion', () => {
@@ -255,6 +258,14 @@ test('vendorMismatch flags a declared vendor the listing never names', () => {
   // Same listing, but the marketplace item IS an Otterbox: nothing to say.
   expect(vendorMismatch('Otterbox', args.storeHost,
     'Original OtterBox Symmetry Folio for iPad Air 11')).toBe(false);
+});
+
+test('vendorMismatch ignores a shop name whose punctuation differs from its host', () => {
+  // Measured on i-cell.co.il: vendor is "iCell", and both ld+json brand entries say
+  // iCell too. A raw substring test misses this in both directions and emits the
+  // useless caveat "listing does not name iCell".
+  expect(vendorMismatch('iCell', 'www.i-cell.co.il',
+    'Shockproof Folio Case for iPad Air 11')).toBe(false);
 });
 
 test('vendorMismatch ignores a vendor that is just the shop name', () => {

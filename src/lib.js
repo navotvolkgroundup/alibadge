@@ -83,9 +83,13 @@ export const MAX_RATIO_APPLIES_ABOVE = 15;
 // ponytail: brand list is a stub. Real coverage needs a shipped token list;
 // upgrade path is a bundled JSON of registered marks. It is deliberately NOT
 // load-bearing any more — see knownBrandIn().
+// Now that a hit only prints a caveat, an incomplete list costs a missing caveat
+// rather than a suppressed true find — so erring long is the cheap direction.
 const KNOWN_BRAND_TOKENS = [
   'stanley', 'owala', 'dyson', 'nike', 'adidas', 'ray-ban', 'rayban', 'apple',
   'samsung', 'sony', 'bose', 'lego', 'yeti', 'hydroflask', 'lululemon',
+  'otterbox', 'spigen', 'anker', 'belkin', 'jbl', 'logitech', 'garmin',
+  'fitbit', 'xiaomi', 'huawei', 'lenovo', 'asus', 'razer', 'corsair',
 ];
 
 // A brand the STORE ITSELF declares. Shopify always publishes product.vendor, and
@@ -102,10 +106,15 @@ const KNOWN_BRAND_TOKENS = [
 // So this returns a note, not a guard trip.
 export function vendorMismatch(vendor, storeHost, aliTitle) {
   const v = String(vendor || '').trim().toLowerCase();
-  // Dropshippers routinely set vendor to their own shop name, which would mismatch
-  // every listing and mute the extension on exactly the stores it exists to find.
-  const shop = String(storeHost || '').toLowerCase().replace(/^www\./, '').split('.')[0];
-  if (v.length < 3 || (shop && (v.includes(shop) || shop.includes(v)))) return false;
+  if (v.length < 3) return false;
+  // Stores routinely publish their OWN name as the vendor, and a caveat reading
+  // "listing does not name iCell" is pure noise. Compare on alphanumerics only:
+  // measured, i-cell.co.il publishes vendor "iCell", and a raw substring test misses
+  // that in both directions because of the hyphen.
+  const flat = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const shop = flat(String(storeHost).replace(/^www\./, '').split('.')[0]);
+  const vf = flat(v);
+  if (shop && vf && (vf.includes(shop) || shop.includes(vf))) return false;
   return !String(aliTitle || '').toLowerCase().includes(v);
 }
 

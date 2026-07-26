@@ -66,6 +66,20 @@ var AliBadgeReceipt = (() => {
     return t + '…';
   }
 
+  // Greedy word wrap. Caveat text is generated from a vendor or brand name, so its
+  // length is not knowable ahead of time; the caller caps the line count.
+  function wrap(g, text, maxW) {
+    const out = [];
+    let line = '';
+    for (const word of String(text || '').split(/\s+/)) {
+      const next = line ? line + ' ' + word : word;
+      if (line && g.measureText(next).width > maxW) { out.push(line); line = word; }
+      else line = next;
+    }
+    if (line) out.push(ellipsize(g, line, maxW));
+    return out;
+  }
+
   // Draw an image cover-cropped into a box, or a labelled placeholder if it failed
   // to load. A missing thumbnail must never become a fabricated one.
   function drawThumb(g, img, x, y, size, label) {
@@ -197,11 +211,23 @@ var AliBadgeReceipt = (() => {
       g.fillStyle = C.accent;
       g.fillText(Math.round((d.storePrice / d.aliPrice) * 10) / 10 + '×', px + 20, TOP + 190);
     }
-    // The caveat is printed on the artifact, not just the badge: the receipt is
-    // what gets posted, so anything qualifying the number has to travel with it.
+    // The caveat is printed on the artifact, not just the badge: the receipt is what
+    // gets posted, so anything qualifying the number travels with it. It gets real
+    // size in the panel's dead space rather than 11px at the bottom — a timeline
+    // scales this PNG down, and a qualifier nobody can read is not a qualifier. It
+    // does NOT displace 'excludes shipping', which is a separate disclosure.
+    if (d.note) {
+      let ny = TOP + 224;
+      g.font = f(14);
+      g.fillStyle = C.accent;
+      for (const line of wrap(g, d.note, pw - 40).slice(0, 2)) {
+        g.fillText(line, px + 20, ny);
+        ny += 19;
+      }
+    }
     g.font = f(11);
-    g.fillStyle = d.note ? C.accent : C.dim;
-    g.fillText(ellipsize(g, d.note || 'excludes shipping', pw - 40), px + 20, TOP + COL_H - 20);
+    g.fillStyle = C.dim;
+    g.fillText('excludes shipping', px + 20, TOP + COL_H - 20);
 
     // --- the three numbers: ONE store price, ONE compared price ---------------
     // Deliberately three cells, not rows per variant: the store has a single price

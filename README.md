@@ -85,7 +85,14 @@ with prices and sold counts.
   (the store title contains a known mark) render the number and print a caveat beside
   it. Suppression was tried on both and thrown out: it discards a true find — the same
   item, far cheaper — to avoid an assertion the caveat already prevents. `note` travels
-  onto the receipt for the same reason: the artifact is what gets posted.
+  onto the receipt for the same reason: the artifact is what gets posted, at 14px in
+  the accent colour — a timeline scales the PNG down, and an illegible qualifier is
+  not a qualifier. It does not displace `excludes shipping`, which is separate.
+- **A store's own name is often its `vendor`.** i-cell.co.il publishes `vendor: iCell`
+  and two ld+json `brand.name: iCell` entries — no Otterbox anywhere, even though the
+  title says it. So `vendorMismatch` compares on alphanumerics only (`icell` vs
+  `i-cell`, which a raw substring test misses in both directions), and the brand token
+  list is what actually catches that page.
 - **Only two things still silence the badge:** `ratio_implausible` (a gap that large on
   a price that high means the MATCH is wrong, not that the markup is big) and
   `price_dispersion`. Both say the comparison itself is unsound, which no caveat fixes.

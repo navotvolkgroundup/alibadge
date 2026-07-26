@@ -21,7 +21,9 @@
   <div class="half dark"><div class="lbl">dark timeline</div><img id="b"></div>
 </div>
 <div id="err"></div>
-<script src="src/receipt.js"></script>
+<!-- Cache-busted: an unversioned src had the browser serving a stale receipt.js and
+     silently showing the previous layout as if the edit had not applied. -->
+<script>document.write('<script src="src/receipt.js?v=' + Date.now() + '"><\/script>')</script>
 <script>
 // Real values measured on 2026-07-26, not invented.
 const DATA = {
@@ -40,6 +42,10 @@ const DATA = {
   sold: '180 sold',
   markup: 774,
   priceBasis: 'matched listing, dearest variant',
+  // LAYOUT PROBE, not a measured field for this store: warmlydecor publishes its own
+  // name as vendor and no brand token, so it would carry no caveat in reality. Set
+  // here only to check the note line renders and clips instead of overflowing.
+  note: 'otterbox is a brand name — listing may be a copy',
   shipTo: 'US',
   capturedAt: '2026-07-26',
 };
