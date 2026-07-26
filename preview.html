@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Receipt design harness. Renders receipt.js with real measured data so the
+     composition can be iterated without reloading the extension.
+     Serve the project dir and open this:  python3 -m http.server 8777 -->
+<meta charset="utf-8">
+<title>AliBadge receipt preview</title>
+<style>
+  body { margin: 0; background: #6b7280; font: 13px ui-monospace, Menlo, monospace; }
+  .row { display: flex; gap: 0; }
+  .half { flex: 1; padding: 20px; }
+  .light { background: #ffffff; }
+  .dark { background: #15202b; }
+  .lbl { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+  .light .lbl { color: #536471; }
+  .dark .lbl { color: #8b98a5; }
+  img { width: 100%; height: auto; display: block; border-radius: 10px; }
+  #err { color: #fff; padding: 12px 20px; }
+</style>
+<div class="row">
+  <div class="half light"><div class="lbl">light timeline</div><img id="a"></div>
+  <div class="half dark"><div class="lbl">dark timeline</div><img id="b"></div>
+</div>
+<div id="err"></div>
+<script src="src/receipt.js"></script>
+<script>
+// Real values measured on 2026-07-26, not invented.
+const DATA = {
+  storeHost: 'warmlydecor.com',
+  storeTitle: 'Royal Vintage Cutlery Set — 24 piece',
+  storePrice: 84.95,
+  currency: 'USD',
+  storeImage: 'https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1410527736.jpg',
+  aliTitle: 'Luxury Gold Vintage Western Gold-Plated Stainless Steel Cutlery Set',
+  aliPrice: 9.72,
+  // In the extension these are data URLs produced by the worker (thumb()), because
+  // alicdn serves images with no ACAO in a browser context and would taint the
+  // canvas. The preview uses a same-origin file to stand in for that.
+  aliImage: 'fixtures/ali-thumb.jpg',
+  aliUrl: 'https://www.aliexpress.com/item/32930388619.html',
+  sold: '180 sold',
+  markup: 774,
+  priceBasis: 'matched listing, lowest variant',
+  shipTo: 'US',
+  capturedAt: '2026-07-26',
+};
+(async () => {
+  try {
+    const blob = await AliBadgeReceipt.render(DATA);
+    if (!blob) throw new Error('render returned null');
+    const url = URL.createObjectURL(blob);
+    a.src = url; b.src = url;
+    err.textContent = `rendered ${Math.round(blob.size / 1024)} KB`;
+  } catch (e) {
+    err.textContent = 'FAILED: ' + e;
+  }
+})();
+</script>

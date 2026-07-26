@@ -210,6 +210,34 @@ async function fetchResults(fileId, attempt = 1) {
   })).filter((r) => r.productId);
 }
 
+// --- thumbnails for the receipt ----------------------------------------------
+// The receipt is drawn on a canvas in the content script, and toBlob() throws on a
+// tainted canvas. Measured: ae01.alicdn.com serves images with NO
+// access-control-allow-origin in a browser context, and aliexpress-media.com is
+// blocked outright by common ad blockers. So the worker fetches them (no CORS
+// applies to host_permissions) and hands back data URLs, which never taint.
+async function thumb(url, px = 260) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { credentials: 'omit' });
+    if (!res.ok) return null;
+    const bmp = await createImageBitmap(await res.blob());
+    const s = Math.min(1, px / Math.max(bmp.width, bmp.height));
+    const c = new OffscreenCanvas(Math.round(bmp.width * s), Math.round(bmp.height * s));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    const blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
+    const buf = await blob.arrayBuffer();
+    const b = new Uint8Array(buf);
+    let bin = '';
+    for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return 'data:image/jpeg;base64,' + btoa(bin);
+  } catch (e) {
+    log('thumb failed', String(e).slice(0, 80));
+    return null;
+  }
+}
+
 // --- pipeline ----------------------------------------------------------------
 
 async function lookup(extraction, pageOrigin) {
@@ -268,7 +296,13 @@ async function lookup(extraction, pageOrigin) {
   };
   if (verdict.winner) {
     const ali = parsePrice(verdict.winner.price);
+    // Fetched here, not in the page: see thumb().
+    const [storeThumb, aliThumb] = await Promise.all([
+      thumb(extraction.image), thumb(verdict.winner.image),
+    ]);
     Object.assign(out, {
+      storeThumb,
+      aliThumb,
       aliPrice: ali,
       aliCurrency: verdict.winner.currency || extraction.currency || CURRENCY,
       aliUrl: verdict.winner.url,

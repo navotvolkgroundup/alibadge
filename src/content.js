@@ -265,25 +265,69 @@
     }
   }
 
-  // ponytail: text receipt, not the designed PNG. The approved mockup needs a
-  // canvas composition; this proves the data is all present and copyable first.
+  // The receipt PNG is the artifact that actually travels. Rendered and written to
+  // the clipboard HERE, on a user gesture with the document focused: the worker has
+  // no navigator.clipboard.
   async function copyReceipt(extraction, v, $) {
-    const lines = [
-      `${extraction.host} — ${extraction.title}`,
-      `store:      ${extraction.price} ${extraction.currency || ''}`.trim(),
-      `aliexpress: ${v.aliPrice} ${v.aliCurrency}`,
-      `markup:     +${v.markup}%`,
-      v.sold ? `sold:       ${v.sold}` : null,
-      `ships-to ${v.shipTo} · ${v.aliCurrency} · captured ${v.capturedAt} · excludes shipping`,
-      v.aliUrl || '',
-    ].filter(Boolean);
+    const btn = $('[data-copy]');
+    const done = (label, revert = true) => {
+      btn.textContent = label;
+      if (revert) setTimeout(() => (btn.textContent = 'copy receipt'), 2200);
+    };
+    btn.textContent = 'rendering…';
     try {
-      await navigator.clipboard.writeText(lines.join('\n'));
-      $('[data-copy]').textContent = 'copied';
-      setTimeout(() => ($('[data-copy]').textContent = 'copy receipt'), 2000);
-    } catch {
-      $('[data-copy]').textContent = 'copy failed';
+      const blob = await AliBadgeReceipt.render({
+        storeHost: extraction.host,
+        storeTitle: extraction.title,
+        storePrice: extraction.price,
+        currency: extraction.currency,
+        storeImage: extraction.image,
+        aliTitle: v.aliTitle,
+        aliPrice: v.aliPrice,
+        aliImage: v.aliImage,
+        aliUrl: v.aliUrl,
+        sold: v.sold,
+        markup: v.markup,
+        // Printed on the receipt rather than implied. Today the results API gives
+        // one price per listing and it is the listing's LOWEST variant, which
+        // inflates the ratio — so say so, and change this string when the
+        // conservative dearest-variant lookup lands.
+        priceBasis: 'matched listing, lowest variant',
+        shipTo: v.shipTo,
+        capturedAt: v.capturedAt,
+      });
+      if (!blob) return done('render failed');
+
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      done('copied ✓');
+      log('receipt copied,', Math.round(blob.size / 1024) + 'kb');
+    } catch (e) {
+      // Most likely causes: the document lost focus, or clipboard-image write is
+      // unsupported. Offer the file instead of failing silently.
+      log('receipt clipboard failed:', String(e).slice(0, 120));
+      try {
+        const blob = await AliBadgeReceipt.render(receiptData(extraction, v));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `alibadge-${extraction.host}-${v.capturedAt}.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+        done('downloaded ✓');
+      } catch {
+        done('copy failed');
+      }
     }
+  }
+
+  function receiptData(extraction, v) {
+    return {
+      storeHost: extraction.host, storeTitle: extraction.title,
+      storePrice: extraction.price, currency: extraction.currency,
+      storeImage: extraction.image, aliTitle: v.aliTitle, aliPrice: v.aliPrice,
+      aliImage: v.aliImage, aliUrl: v.aliUrl, sold: v.sold, markup: v.markup,
+      priceBasis: 'matched listing, lowest variant',
+      shipTo: v.shipTo, capturedAt: v.capturedAt,
+    };
   }
 
   // --- run -------------------------------------------------------------------

@@ -23,10 +23,20 @@ src/lib.js         pure functions — every path that can produce a WRONG NUMBER
 src/lib.test.js    bun test, 27 cases
 src/worker.js      all network + all chrome.* ; the two AliExpress calls
 src/content.js     extract, render, teardown, dismiss. No imports (content scripts can't)
+src/receipt.js     the shareable PNG, drawn on a canvas. Loaded BEFORE content.js so they
+                   share the isolated world's scope
+preview.html       receipt design harness (see below)
 smoke.js           runs the worker pipeline outside Chrome: bun smoke.js
 ```
 
-`bun test` for the logic. `bun smoke.js` for the live pipeline.
+`bun test` for the logic. `bun smoke.js` for the live pipeline. For the receipt design:
+
+```
+python3 -m http.server 8777   # then open http://127.0.0.1:8777/preview.html
+```
+
+`preview.html` renders `receipt.js` with real measured data against both a light and a
+dark timeline, so the composition can be iterated without reloading the extension.
 
 ## Verified pipeline
 
@@ -72,10 +82,15 @@ with prices and sold counts.
 
 ## Not built yet
 
-- **Receipt PNG.** `copy receipt` currently writes plain text. The approved mockup is at
-  `~/.gstack/projects/navotvolkgroundup-nabot/designs/alibadge-receipt-20260726/remix/variant-B.png`
-  and needs a canvas composition. Its layout rule is load-bearing: the store has ONE price
-  and the marketplace has MANY, so any symmetric two-column presentation invents data.
+- **Per-variant price table on the receipt.** The approved mockup has one; the results API
+  returns a single price per listing, so there is no variant data to render. Omitted rather
+  than invented, per the doc's own rule. Add it if the PDP lookup lands (it returns a full
+  `skuPriceInfoMap`).
+- **Conservative variant pricing.** The receipt prints `based on matched listing, lowest
+  variant` because `salePrice.minPrice` is the cheapest variant, which INFLATES the markup.
+  The doc calls the dearest variant the conservative choice, and measured it flipped 3 of 10
+  verdicts. `smoke.js` shows the fix via `mtop.aliexpress.pdp.pc.query`. **This is the most
+  important open correctness item.**
 - **Perceptual hash gate (blockhash).** `decide()` takes a `gate` argument and currently
   gets `null`, falling back to AliExpress's own result rank — which is itself a visual
   similarity signal, with the brand guard and markup floor still gating. Add blockhash

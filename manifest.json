@@ -18,6 +18,7 @@
         "*://*.aliexpress-media.com/*"
       ],
       "js": [
+        "src/receipt.js",
         "src/content.js"
       ],
       "run_at": "document_idle"
