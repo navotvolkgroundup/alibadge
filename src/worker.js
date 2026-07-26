@@ -17,9 +17,10 @@ const RESULTS_LOCALE = 'https://www.aliexpress.com';
 const SHIP_TO = 'US';      // pinned, disclosed on the receipt so a third party can reproduce
 const CURRENCY = 'USD';    // ditto — NOT derived from locale
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-// Bump to invalidate every existing entry. Needed once already: failures were
-// being cached, so a transient no_results outlived the fix for it.
-const CACHE_V = 'v2';
+// Bump to invalidate every existing entry. Entries now hold search RESULTS, not
+// verdicts, so this only needs bumping when the result SHAPE changes — never for a
+// change to decide().
+const CACHE_V = 'v3';
 const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
 const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
 const HOURLY_CAP = 120;
@@ -297,7 +298,7 @@ async function thumb(url, px = 260) {
 async function lookup(extraction, pageOrigin) {
   const urlKey = urlCacheKey(extraction.url);
   const early = urlKey ? await cacheGet([urlKey]) : null;
-  if (early) { log('cache hit (url)'); return early; }
+  if (early) { log('cache hit (url)'); return judge(extraction, early); }
 
   if (!isAllowedImageUrl(extraction.image, pageOrigin)) {
     return { render: 'none', reasons: ['image_url_disallowed'] };
@@ -309,7 +310,7 @@ async function lookup(extraction, pageOrigin) {
 
   const byteKey = await sha256(buf);
   const hit = await cacheGet([byteKey]);
-  if (hit) { log('cache hit (bytes)'); return hit; }
+  if (hit) { log('cache hit (bytes)'); return judge(extraction, hit); }
 
   const bytes = new Uint8Array(buf);
   let bin = '';
@@ -355,10 +356,28 @@ async function lookup(extraction, pageOrigin) {
     log(`repriced ${ok.length}/${head.length} into ${extraction.currency}`);
   }
 
+  // Cache the SEARCH, not the verdict — see judge(). Empty results are the one
+  // transient case that reaches here (every other failure returned early), and
+  // caching those turned one bad minute into a week of silence.
+  if (priced.length) {
+    await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], { fileId, results: priced });
+  } else {
+    log('not caching: no results');
+  }
+  return judge(extraction, { fileId, results: priced });
+}
+
+// Everything downstream of the network. Deliberately OUTSIDE the cache: twice now
+// a decision-logic fix has been invisible because a stale verdict was replayed
+// from storage, and bumping CACHE_V each time only defers the next occurrence.
+// Re-deciding on every read costs one function call and makes that class impossible.
+async function judge(extraction, found) {
+  const { fileId, results } = found;
+
   // ponytail: no perceptual hash yet — AliExpress's own result rank IS a visual
   // similarity signal, and the brand guard + markup floor still gate. Add
   // blockhash when rank measurably admits wrong matches.
-  const verdict = decide(extraction, priced, null);
+  const verdict = decide(extraction, results, null);
 
   const out = {
     render: verdict.render,
@@ -386,17 +405,6 @@ async function lookup(extraction, pageOrigin) {
     });
   }
   log('verdict', out.render, out.reasons);
-  // NEVER cache a transient failure. A verdict is only cacheable when the same
-  // inputs would produce it again: a decision (floor, brand guard, currency) is
-  // stable; a network failure is not. Caching the latter turned one bad minute
-  // into a week of silence and hid the fix for it.
-  const TRANSIENT = /^(no_results|punished|rate_capped|upload_failed|image_fetch_failed|worker_error|results_http_)/;
-  const cacheable = !(out.reasons || []).some((r) => TRANSIENT.test(r));
-  if (cacheable) {
-    await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], out);
-  } else {
-    log('not caching transient verdict:', (out.reasons || []).join(', '));
-  }
   return out;
 }
 
