@@ -80,12 +80,15 @@ with prices and sold counts.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
   own `history`, so the patch never intercepts the page, and `replaceState` (which Shopify
   variant switching uses) never fires `popstate`.
-- **A brand mismatch is a NOTE, not a guard.** When the store declares
-  `product.vendor: Otterbox` and the matched listing never says Otterbox, the badge
-  still renders the number and prints `listing does not name Otterbox` beside it.
-  Suppressing it was tried and thrown out: it discards a true find (the same case,
-  far cheaper) to avoid an assertion the caveat already prevents. `note` travels onto
-  the receipt for the same reason — the artifact is what gets posted.
+- **Brand signals are NOTES, not guards.** Both `vendorMismatch()` (the store declares
+  `product.vendor: Otterbox`, the listing never says Otterbox) and `knownBrandIn()`
+  (the store title contains a known mark) render the number and print a caveat beside
+  it. Suppression was tried on both and thrown out: it discards a true find — the same
+  item, far cheaper — to avoid an assertion the caveat already prevents. `note` travels
+  onto the receipt for the same reason: the artifact is what gets posted.
+- **Only two things still silence the badge:** `ratio_implausible` (a gap that large on
+  a price that high means the MATCH is wrong, not that the markup is big) and
+  `price_dispersion`. Both say the comparison itself is unsound, which no caveat fixes.
 - **The brand-guard ceiling is conditional on absolute price.** A $2 item at 36× is
   ordinary dropshipping; a $200 item at 36× suggests a counterfeit. An unconditioned 15×
   ceiling suppresses the genuine dropshippers this exists to find.

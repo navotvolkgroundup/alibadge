@@ -81,7 +81,8 @@ export const MAX_RATIO = 15;
 export const MAX_RATIO_APPLIES_ABOVE = 15;
 
 // ponytail: brand list is a stub. Real coverage needs a shipped token list;
-// upgrade path is a bundled JSON of registered marks.
+// upgrade path is a bundled JSON of registered marks. It is deliberately NOT
+// load-bearing any more — see knownBrandIn().
 const KNOWN_BRAND_TOKENS = [
   'stanley', 'owala', 'dyson', 'nike', 'adidas', 'ray-ban', 'rayban', 'apple',
   'samsung', 'sony', 'bose', 'lego', 'yeti', 'hydroflask', 'lululemon',
@@ -108,6 +109,15 @@ export function vendorMismatch(vendor, storeHost, aliTitle) {
   return !String(aliTitle || '').toLowerCase().includes(v);
 }
 
+// Which brand token the STORE side mentions, or null. Like vendorMismatch this is a
+// note rather than a guard: an unconditional trip on the word 'apple' silenced a
+// legitimate cheaper listing for the same case, and suppressing a true find to avoid
+// an implication the caveat already prevents is the wrong trade twice over.
+export function knownBrandIn(title, storeHost) {
+  const hay = (title + ' ' + storeHost).toLowerCase();
+  return KNOWN_BRAND_TOKENS.find((b) => hay.includes(b)) || null;
+}
+
 export function brandGuard({ storePrice, aliPrice, title = '', storeHost = '', resultPrices = [] }) {
   const reasons = [];
   const ratio = storePrice / aliPrice;
@@ -116,8 +126,6 @@ export function brandGuard({ storePrice, aliPrice, title = '', storeHost = '', r
   // real brand, not a dropshipper's markup.
   if (aliPrice > MAX_RATIO_APPLIES_ABOVE && ratio > MAX_RATIO) reasons.push('ratio_implausible');
 
-  const hay = (title + ' ' + storeHost).toLowerCase();
-  if (KNOWN_BRAND_TOKENS.some((b) => hay.includes(b))) reasons.push('known_brand');
 
   // Many wildly different prices for one photograph is the counterfeit signature.
   const p = resultPrices.filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
@@ -168,15 +176,23 @@ export function decide(extraction, results, gate) {
     resultPrices: results.map((r) => parsePrice(r.price)).filter(Boolean),
   });
 
-  // A guard trip means we may be looking at a legitimate brand being counterfeited.
-  // Say nothing at all rather than linking, which would still imply something.
+  // What survives as a hard guard: a gap so implausible on a non-trivial price, or a
+  // price spread so wide, that the match itself is suspect. Say nothing at all rather
+  // than linking, which would still imply something.
   if (guard.length) return { render: 'none', winner, reasons: [...reasons, ...guard] };
 
-  // Not a reason — reasons downgrade the render. This rides along with a full
-  // badge so the number still shows and the caveat shows with it.
-  const note = vendorMismatch(extraction.vendor, extraction.host, winner.title)
-    ? `listing does not name ${extraction.vendor}`
-    : null;
+  // Notes are NOT reasons — reasons downgrade the render, notes ride along with a
+  // full badge so the number still shows and the caveat shows with it.
+  const brand = knownBrandIn(extraction.title || '', extraction.host || '');
+  const notes = [];
+  if (vendorMismatch(extraction.vendor, extraction.host, winner.title)) {
+    notes.push(`listing does not name ${extraction.vendor}`);
+  } else if (brand && !String(winner.title || '').toLowerCase().includes(brand)) {
+    // Only when the listing does not claim the brand — if it does, the vendor path
+    // above already had nothing to say and repeating the brand adds nothing.
+    notes.push(`${brand} is a brand name — listing may be a copy`);
+  }
+  const note = notes.length ? notes.join(' · ') : null;
 
   if (reasons.length) return { render: 'link-only', winner, reasons, note };
   return { render: 'full', winner, reasons: [], note };

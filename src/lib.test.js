@@ -6,7 +6,7 @@ import {
   parsePrice, parseShopifyCents, isAllowedImageUrl, absoluteFloor, brandGuard,
   decide, pickWinner, urlCacheKey, markupPercent, md5,
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
-  vendorMismatch,
+  vendorMismatch, knownBrandIn,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -110,8 +110,9 @@ test('brand guard vetoes a huge ratio on an EXPENSIVE marketplace item', () => {
 });
 
 test('brand guard vetoes known brand tokens in title or host', () => {
-  expect(brandGuard({ storePrice: 45, aliPrice: 3, title: 'Stanley Quencher 40oz' })).toContain('known_brand');
-  expect(brandGuard({ storePrice: 45, aliPrice: 3, title: 'Tumbler', storeHost: 'shop.yeti.com' })).toContain('known_brand');
+  expect(knownBrandIn('Stanley Quencher 40oz', '')).toBe('stanley');
+  expect(knownBrandIn('Tumbler', 'shop.yeti.com')).toBe('yeti');
+  expect(knownBrandIn('Vintage Cutlery Set', 'warmlydecor.com')).toBe(null);
 });
 
 test('brand guard vetoes extreme price dispersion', () => {
@@ -148,11 +149,35 @@ test('decide degrades to link-only, never silence, when a fileId exists but the 
   expect(decide({ ...store, price: 30 }, [{ productId: '1', price: '$25', currency: 'USD' }], null).render).toBe('link-only');
 });
 
-test('decide goes SILENT on a brand-guard trip, not link-only', () => {
-  // Linking would still imply something about a brand we may be wrong about.
+test('a brand name renders full and carries the caveat, it does not silence', () => {
+  // Twice measured: suppressing here discarded a genuinely cheaper listing for the
+  // same item. The caveat prevents the implication that silence was protecting.
   const d = decide({ ...store, title: 'Stanley Quencher' }, results, null);
+  expect(d.render).toBe('full');
+  expect(d.note).toBe('stanley is a brand name — listing may be a copy');
+});
+
+test('no brand caveat when the listing itself claims the brand', () => {
+  const d = decide(
+    { ...store, title: 'Stanley Quencher' },
+    [{ productId: '1', price: '$9.72', currency: 'USD', title: 'Stanley Quencher 40oz Tumbler' }],
+    null,
+  );
+  expect(d.render).toBe('full');
+  expect(d.note).toBe(null);
+});
+
+test('decide still goes SILENT on a real guard trip, not link-only', () => {
+  // Linking would still imply something about a match we think is wrong.
+  // $400 against a $20 listing: 20x, and the $20 clears MAX_RATIO_APPLIES_ABOVE, so
+  // this is the implausible-gap case and not a cheap-goods false alarm.
+  const d = decide(
+    { ...store, price: 400 },
+    [{ productId: '1', price: '$20', currency: 'USD', title: 'Tumbler' }],
+    null,
+  );
   expect(d.render).toBe('none');
-  expect(d.reasons).toContain('known_brand');
+  expect(d.reasons).toContain('ratio_implausible');
 });
 
 test('decide bails on currency mismatch rather than comparing across currencies', () => {
