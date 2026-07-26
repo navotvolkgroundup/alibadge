@@ -7,8 +7,8 @@
 
   let generation = 0;
   let badge = null;
-  let debug = false;
-  chrome.storage.local.get('alibadgeDebug').then((r) => (debug = !!r.alibadgeDebug));
+  let debug = true; // see worker.js — on by default for unpacked builds
+  chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false));
   const log = (...a) => debug && console.log('[alibadge]', ...a);
 
   const ask = (msg) =>

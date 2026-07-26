@@ -21,8 +21,10 @@ const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
 const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
 const HOURLY_CAP = 120;
 
-let debug = false;
-chrome.storage.local.get('alibadgeDebug').then((r) => (debug = !!r.alibadgeDebug));
+// Default ON: silence is this extension's normal state, so a load-unpacked build
+// with logging off is indistinguishable from a broken one. Opt out explicitly.
+let debug = true;
+chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false));
 const log = (...a) => debug && console.log('[alibadge]', ...a);
 
 // --- serial queue + token bucket --------------------------------------------
