@@ -42,39 +42,64 @@
     return !!document.querySelector('img[src*="cdn.shopify.com"], link[href*="cdn.shopify.com"]');
   }
 
-  // Shopify Markets serves a presentment currency on the page while /products/x.js
-  // can still return the shop's DEFAULT currency (measured on warmlydecor: JSON
-  // 8495 = $84.95, page shows ₪259.00, and the JSON has no `currency` field at
-  // all). The price on screen is definitionally what the shopper pays, so the DOM
-  // is the source of truth and the JSON supplies the image and variant.
-  const SYMBOLS = [
-    [/₪|NIS|ILS/i, 'ILS'], [/€|EUR/i, 'EUR'], [/£|GBP/i, 'GBP'],
-    [/C\$|CAD/i, 'CAD'], [/A\$|AUD/i, 'AUD'], [/¥|JPY/, 'JPY'], [/\$|USD/i, 'USD'],
-  ];
-  function currencyFrom(text) {
-    for (const [re, code] of SYMBOLS) if (re.test(text)) return code;
+  // Read the structured data the page already publishes rather than guessing at
+  // theme CSS. Loose selectors like `.price` match recommendation cards elsewhere
+  // on the page — measured: they returned 78.95 (a different product) on a page
+  // whose actual price is 259.
+  //
+  // The ratio is currency-invariant, so all that matters is that the store price
+  // and the marketplace price use the SAME currency. JSON-LD gives an authoritative
+  // price AND its currency together, which is exactly the pair needed.
+  function structuredPrice() {
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      let data;
+      try { data = JSON.parse(s.textContent); } catch { continue; }
+      for (const node of flatten(data)) {
+        if (!node || typeof node !== 'object') continue;
+        const type = node['@type'];
+        const isProduct = type === 'Product' || (Array.isArray(type) && type.includes('Product'));
+        if (!isProduct || !node.offers) continue;
+        for (const offer of [].concat(node.offers)) {
+          if (!offer || typeof offer !== 'object') continue;
+          const raw = offer.price ?? offer.lowPrice ?? offer.highPrice;
+          const price = parseFloat(String(raw).replace(/,/g, ''));
+          if (Number.isFinite(price) && price > 0) {
+            return { price, currency: offer.priceCurrency || null, src: 'ld+json' };
+          }
+        }
+      }
+    }
+    // Both spellings occur in the wild. Measured on warmlydecor: it publishes
+    // og:price:* and no ld+json at all.
+    for (const pfx of ['og:price', 'product:price']) {
+      const amt = document.querySelector(`meta[property="${pfx}:amount"]`);
+      const cur = document.querySelector(`meta[property="${pfx}:currency"]`);
+      const price = amt && parseFloat(String(amt.getAttribute('content')).replace(/,/g, ''));
+      if (Number.isFinite(price) && price > 0) {
+        return { price, currency: cur ? cur.getAttribute('content') : null, src: pfx };
+      }
+    }
     return null;
   }
 
-  function domPriceText() {
-    // Independent check that the extracted price is the one on screen. Catches
-    // currency mismatches AND variant-selection bugs in one comparison.
-    const sel = [
-      '[data-price]', '.price__current', '.price-item--sale', '.price-item--regular',
-      '.product__price', '.price', '[class*="ProductPrice"]',
-    ];
-    for (const s of sel) {
-      const el = document.querySelector(s);
-      const t = el && el.textContent && el.textContent.trim();
-      if (t && /\d/.test(t)) return t;
+  // Last resort for currency only. /cart.js is a stable same-origin Shopify
+  // endpoint that always reports the shop's active currency.
+  async function cartCurrency() {
+    try {
+      const r = await fetch('/cart.js', { credentials: 'same-origin' });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return j && j.currency ? j.currency : null;
+    } catch {
+      return null;
     }
-    const og = document.querySelector('meta[property="product:price:amount"]');
-    return og ? og.getAttribute('content') : null;
   }
 
-  function numbersIn(str) {
-    const m = String(str || '').match(/\d[\d,]*(?:\.\d+)?/g);
-    return m ? m.map((n) => parseFloat(n.replace(/,/g, ''))).filter((n) => n > 0) : [];
+  function* flatten(v, depth = 0) {
+    if (!v || typeof v !== 'object' || depth > 5) return;
+    if (Array.isArray(v)) { for (const x of v) yield* flatten(x, depth + 1); return; }
+    yield v;
+    if (v['@graph']) yield* flatten(v['@graph'], depth + 1);
   }
 
   async function extract() {
@@ -112,33 +137,20 @@
     let finalPrice = price;
     let finalCurrency = currency;
 
-    const domTxt = domPriceText();
-    if (domTxt) {
-      const seen = numbersIn(domTxt);
-      const domCur = currencyFrom(domTxt);
-      // MIN, not max: a price block showing both compare-at and sale prices lists
-      // the higher struck-through figure too, and the shopper pays the lower one.
-      // (Deliberately the opposite of the AliExpress rule, where max is the
-      // conservative choice because a range's low end is a 1-piece variant.)
-      const domPrice = seen.length ? Math.min(...seen) : null;
-      const agrees = domPrice != null && Math.abs(domPrice - price) < Math.max(0.02, price * 0.02);
-
-      if (domPrice != null && !agrees) {
-        // Disagreement is normal under Shopify Markets, not an error. Trust the
-        // screen. Bail only if the gap is absurd, which means we parsed junk.
-        const factor = domPrice / price;
-        if (factor > 100 || factor < 0.01) {
-          console.warn('[alibadge] price parse looks wrong — json', price, 'dom', domPrice);
-          return { skip: 'dom_price_implausible', detail: { price, domPrice, domTxt } };
-        }
-        finalPrice = domPrice;
-        finalCurrency = domCur || currency;
-        log('presentment currency in use:', finalPrice, finalCurrency, '(json had', price, ')');
-      } else if (agrees) {
-        finalCurrency = currency || domCur;
+    const sp = structuredPrice();
+    if (sp && sp.currency) {
+      // Authoritative: an explicit price paired with its own currency code.
+      finalPrice = sp.price;
+      finalCurrency = sp.currency;
+      if (Math.abs(sp.price - price) > Math.max(0.02, price * 0.02)) {
+        log(`price from ${sp.src}: ${sp.price} ${sp.currency} (products.json had ${price})`);
       }
+    } else if (!finalCurrency) {
+      finalCurrency = await cartCurrency();
+      // A bare number with no currency cannot be compared against anything safely.
+      if (!finalCurrency) return { skip: 'no_currency', detail: { jsonPrice: price, structured: sp } };
+      log('currency from /cart.js:', finalCurrency);
     }
-    if (!finalCurrency) return { skip: 'no_currency', detail: { price: finalPrice, domTxt } };
 
     const image = variant.featured_image?.src || p.images?.[0] || p.featured_image || null;
     if (!image) return { skip: 'no_image' };
@@ -216,7 +228,10 @@
 
   async function render(gen, extraction, verdict) {
     if (gen !== generation) return log('stale verdict discarded');
-    if (!verdict || verdict.render === 'none') return log('silent:', verdict && verdict.reasons);
+    if (!verdict || verdict.render === 'none') {
+      console.log('[alibadge] SILENT —', ((verdict && verdict.reasons) || ['no response']).join(', '));
+      return;
+    }
 
     const root = badge ? badge.shadowRoot : mount();
     const $ = (s) => root.querySelector(s);
@@ -227,12 +242,13 @@
       $('[data-mk]').classList.add('pending');
       $('[data-ali]').textContent = 'found on AliExpress';
       $('[data-sub]').textContent = 'no confident price match';
-      log('link-only:', verdict.reasons);
+      console.log('[alibadge] link-only —', (verdict.reasons || []).join(', '));
     } else {
       $('[data-mk]').textContent = '+' + verdict.markup + '%';
       $('[data-mk]').classList.remove('pending');
       const cur = verdict.aliCurrency === 'USD' ? '$' : '';
       $('[data-ali]').textContent = `${cur}${verdict.aliPrice} on AliExpress`;
+      console.log('[alibadge] FULL — markup +' + verdict.markup + '%');
       $('[data-sub]').textContent =
         `excludes shipping · ${verdict.shipTo}/${verdict.aliCurrency} · ${verdict.capturedAt}`;
       $('[data-copy]').hidden = false;
