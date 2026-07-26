@@ -87,9 +87,32 @@ const KNOWN_BRAND_TOKENS = [
   'samsung', 'sony', 'bose', 'lego', 'yeti', 'hydroflask', 'lululemon',
 ];
 
-export function brandGuard({ storePrice, aliPrice, title = '', storeHost = '', resultPrices = [] }) {
+// A brand the STORE ITSELF declares. Shopify always publishes product.vendor, and
+// ld+json publishes brand.name. This beats KNOWN_BRAND_TOKENS because that list is
+// unbounded by construction — measured: a real Otterbox iPad case on a 15-branch
+// Israeli retail chain rendered +570% against a generic AliExpress case, because
+// the list happened to contain 'apple' but not 'otterbox'. There is no version of
+// that list that contains every brand.
+//
+// If the store says "Otterbox" and the matched listing never says "Otterbox", they
+// are not the same product, whatever the photo similarity says.
+function vendorMismatch(vendor, storeHost, aliTitle) {
+  const v = String(vendor || '').trim().toLowerCase();
+  // Dropshippers routinely set vendor to their own shop name, which would mismatch
+  // every listing and mute the extension on exactly the stores it exists to find.
+  const shop = String(storeHost || '').toLowerCase().replace(/^www\./, '').split('.')[0];
+  if (v.length < 3 || (shop && (v.includes(shop) || shop.includes(v)))) return false;
+  return !String(aliTitle || '').toLowerCase().includes(v);
+}
+
+export function brandGuard({
+  storePrice, aliPrice, title = '', storeHost = '', resultPrices = [],
+  vendor = '', aliTitle = '',
+}) {
   const reasons = [];
   const ratio = storePrice / aliPrice;
+
+  if (vendorMismatch(vendor, storeHost, aliTitle)) reasons.push('vendor_mismatch');
 
   // Implausible gap on a non-trivial marketplace price suggests a counterfeit of a
   // real brand, not a dropshipper's markup.
@@ -145,6 +168,8 @@ export function decide(extraction, results, gate) {
     title: extraction.title,
     storeHost: extraction.host,
     resultPrices: results.map((r) => parsePrice(r.price)).filter(Boolean),
+    vendor: extraction.vendor,
+    aliTitle: winner.title,
   });
 
   // A guard trip means we may be looking at a legitimate brand being counterfeited.

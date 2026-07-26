@@ -82,6 +82,20 @@
     return null;
   }
 
+  function ldBrand() {
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      let data;
+      try { data = JSON.parse(s.textContent); } catch { continue; }
+      for (const node of flatten(data)) {
+        const b = node && node.brand;
+        if (!b) continue;
+        const name = typeof b === 'string' ? b : b.name;
+        if (name) return String(name);
+      }
+    }
+    return null;
+  }
+
   // Last resort for currency only. /cart.js is a stable same-origin Shopify
   // endpoint that always reports the shop's active currency.
   async function cartCurrency() {
@@ -155,9 +169,15 @@
     const image = variant.featured_image?.src || p.images?.[0] || p.featured_image || null;
     if (!image) return { skip: 'no_image' };
 
+    // The store's own brand claim, used to reject matches that are a different
+    // product wearing a similar photograph. products.json always carries vendor;
+    // ld+json brand.name is the fallback for non-Shopify-themed pages.
+    const vendor = p.vendor || ldBrand() || '';
+
     return {
       url: location.href,
       host: HOST,
+      vendor,
       title: p.title || '',
       price: finalPrice,
       currency: finalCurrency,

@@ -216,3 +216,29 @@ test('md5 handles the separators the MTOP sign string is built from', () => {
   // sign = md5(token + "&" + t + "&" + appKey + "&" + data)
   expect(md5('a b&c')).toBe('8e193f79dcba7d1b300ede08603f81d3');
 });
+
+// The measured false accusation: a real Otterbox case on a legitimate 15-branch
+// Israeli retailer, matched against a generic AliExpress case at 6.7x.
+test('brandGuard rejects a declared vendor the listing never names', () => {
+  const args = {
+    storePrice: 299, aliPrice: 44.6, storeHost: 'i-cell.co.il',
+    title: 'כיסוי Otterbox ל iPad Air 11"',
+    aliTitle: 'Shockproof Folio Case for iPad Air 11 inch Tablet Cover',
+  };
+  expect(brandGuard({ ...args, vendor: 'Otterbox' })).toContain('vendor_mismatch');
+  // Same listing, but the marketplace item IS an Otterbox: no trip.
+  expect(brandGuard({
+    ...args, vendor: 'Otterbox',
+    aliTitle: 'Original OtterBox Symmetry Folio for iPad Air 11',
+  })).not.toContain('vendor_mismatch');
+});
+
+test('brandGuard ignores a vendor that is just the shop name', () => {
+  // Dropshippers set vendor to themselves; tripping here would mute the extension
+  // on exactly the stores it exists to find.
+  expect(brandGuard({
+    storePrice: 84.95, aliPrice: 9.72, storeHost: 'www.warmlydecor.com',
+    vendor: 'WarmlyDecor', title: 'Vintage Cutlery Set',
+    aliTitle: 'Luxury Gold Stainless Steel Cutlery Set 24pc',
+  })).toEqual([]);
+});
