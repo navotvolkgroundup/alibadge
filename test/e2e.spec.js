@@ -52,6 +52,10 @@ function dress(extraction, verdict) {
       aliPrice: ali, aliCurrency: verdict.winner.currency, aliUrl: verdict.winner.url,
       aliTitle: verdict.winner.title, aliImage: verdict.winner.image, sold: verdict.winner.sold,
       markup: ali ? markupPercent(extraction.price, ali) : null,
+      // Mirrors the worker: derived from the winner, never a constant.
+      priceBasis: verdict.winner.basis === 'dearest'
+        ? 'matched listing, dearest variant'
+        : 'matched listing, cheapest variant — markup is an upper bound',
       shipTo: 'US', capturedAt: '2026-07-27',
     });
   }
@@ -177,6 +181,24 @@ test('a brand caveat renders WITH the number instead of suppressing it', async (
   await expect(badge(page)).toBeAttached({ timeout: 15000 });
   await expect(badge(page).locator('[data-mk]')).toHaveText('+570%');
   await expect(badge(page).locator('[data-sub]')).toContainText('otterbox is a brand name');
+});
+
+test('the receipt basis follows the data, it is not asserted', async ({ page }) => {
+  // Regression guard for a real shipped bug: the receipt printed 'dearest variant' for
+  // a whole period after the code that produced dearest prices was deleted.
+  const seen = await loadProduct(page, {
+    title: 'Royal Vintage Cutlery Set', price: 84.95, currency: 'USD', vendor: 'WarmlyDecor',
+  }, CHEAP);
+  await expect(badge(page)).toBeAttached({ timeout: 15000 });
+  // CHEAP carries no basis flag, so the bound must be claimed — never 'dearest'.
+  const v = dress(seen[0], decide(seen[0], CHEAP, null));
+  expect(v.priceBasis).toContain('upper bound');
+  expect(v.priceBasis).not.toContain('dearest');
+
+  // With the flag set, and only then, the tighter claim is allowed.
+  const upgraded = [{ ...CHEAP[0], price: '$28.00', basis: 'dearest' }];
+  expect(dress(seen[0], decide(seen[0], upgraded, null)).priceBasis)
+    .toBe('matched listing, dearest variant');
 });
 
 test('skips a non-product path without touching the network', async ({ page }) => {

@@ -3,12 +3,10 @@
 // This file only extracts, renders, and tears down.
 (() => {
   const PRODUCT_PATH = /^\/products\/[^/]+\/?$/;
-  // MEASURED: the results payload carries ONLY salePrice.minPrice — no max, no range,
-  // and formattedPrice is never "a - b". So the compared figure is the listing's
-  // CHEAPEST variant, and the markup it produces is an upper bound, not a measurement.
-  // Saying "dearest variant" here was false; saying nothing would let the reader
-  // assume the tighter claim. The receipt states the bound instead.
-  const PRICE_BASIS = 'matched listing, cheapest variant — markup is an upper bound';
+  // The basis comes from the WORKER, which knows whether the dearest-variant lookup
+  // actually succeeded. A constant here is what let the receipt print 'dearest
+  // variant' for a whole period after the code stopped doing that.
+  const FALLBACK_BASIS = 'matched listing, cheapest variant — markup is an upper bound';
   const HOST = location.hostname;
 
   let generation = 0;
@@ -352,7 +350,7 @@
       storePrice: extraction.price, currency: extraction.currency,
       storeImage: extraction.image, aliTitle: v.aliTitle, aliPrice: v.aliPrice,
       aliImage: v.aliImage, aliUrl: v.aliUrl, sold: v.sold, markup: v.markup,
-      priceBasis: PRICE_BASIS,
+      priceBasis: v.priceBasis || FALLBACK_BASIS,
       note: v.note || null,
       shipTo: v.shipTo, capturedAt: v.capturedAt,
     };

@@ -56,10 +56,14 @@ dark timeline, so the composition can be iterated without reloading the extensio
    appKey 24815441, on `recom-acs.aliexpress.com`. Returns a `fileId`.
 3. **Results** — `POST /fn/search-pc/index` with `{isNewImageSearch:"y", filename:<fileId>}`.
    Returns **60** items at `data.data.root.fields.mods.itemList.content`. Needs no cookies.
-4. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
+4. **Dearest variant** — ONE `pdp.pc.query` for the winner only, before the cache write,
+   so a cache hit never re-issues it. Returns null on a punish and the badge degrades to
+   the bound rather than disappearing. Whether it works inside the extension is the
+   open question — `self.__alibadgePdp('<productId>')` answers it in one line.
+5. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
    currency around the results call, so all 60 candidates arrive already comparable, then
    restores whatever the user had. No FX rate exists anywhere in this extension.
-5. **Decide** — `decide()` owns the render policy and returns all failing reasons.
+6. **Decide** — `decide()` owns the render policy and returns all failing reasons.
 
 Verified live end-to-end on 2026-07-26: handshake → 180,488-char base64 upload → 60 items
 with prices and sold counts.
@@ -95,9 +99,10 @@ with prices and sold counts.
 - **The results payload has no dearest-variant price.** Dumped 2026-07-27 across 60
   items: `salePrice.minPrice` and nothing else — no max, no `skuPriceInfoMap`, and
   `formattedPrice` is never a range, so `parsePrice`'s range-max path never fires here.
-  Every markup is therefore an **upper bound**, and `PRICE_BASIS` in `content.js` says
-  so on the receipt. Do not restore a "dearest variant" claim without a per-product
-  call to back it.
+  Without the `pdp.pc.query` upgrade the markup is an **upper bound**, and the receipt
+  says so. **The basis string is DERIVED from the winner, never hardcoded** — a constant
+  is exactly what let the receipt print "dearest variant" for a whole period after the
+  code producing dearest prices was deleted. There is a Playwright test on this.
 - **Don't add the `tabs` permission.** `changeInfo.url` is populated already because
   `host_permissions` covers the tab.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
@@ -124,10 +129,6 @@ with prices and sold counts.
   ceiling suppresses the genuine dropshippers this exists to find.
 
 ## Not built yet
-
-- **Conservative variant pricing.** One `pdp.pc.query` call for the winner only, tried
-  from *inside* the extension where the punish may not apply. Would turn the upper
-  bound into a measurement. Until then the receipt states the bound.
 
 - **Per-variant price table on the receipt.** The approved mockup has one; the results API
   returns a single price per listing, so there is no variant data to render. Omitted rather

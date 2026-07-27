@@ -172,6 +172,62 @@ async function uploadImage(b64, currency) {
 // region stays US to match the pinned shpt_co, which the receipt discloses.
 const AEP_COOKIE = 'aep_usuc_f';
 
+// --- AliExpress: the winner's DEAREST variant --------------------------------
+// The results payload carries only salePrice.minPrice — dumped across 60 items, there
+// is no max and no range. So the compared figure is the listing's CHEAPEST variant and
+// every markup is an upper bound.
+//
+// pdp.pc.query returns the full sku price map. It is punished on the first call from
+// bun, which is why the earlier top-3 re-price was deleted; from inside the extension
+// it may not be. ONE call, for the winner only, so a punish costs one request rather
+// than three and the badge degrades to the bound instead of disappearing.
+const PDP_API = 'mtop.aliexpress.pdp.pc.query';
+const PDP_APPKEY = '12574478';
+const PDP_HOST = 'https://acs.aliexpress.com';
+
+async function pdpCall(data, token) {
+  const t = Date.now();
+  const sign = md5([token || '', t, PDP_APPKEY, data].join('&'));
+  const qs = new URLSearchParams({
+    jsv: '2.5.1', appKey: PDP_APPKEY, t: String(t), sign,
+    api: PDP_API, v: '1.0', type: 'originaljson', dataType: 'json', timeout: '15000',
+  });
+  const res = await fetch(`${PDP_HOST}/h5/${PDP_API}/1.0/?${qs}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: 'data=' + encodeURIComponent(data),
+  });
+  return res.json().catch(() => null);
+}
+
+// Returns the DEAREST variant price in `currency`, or null. Null is a normal outcome
+// (punish, shape change, unlisted item) and must leave the caller with the bound.
+async function pdpDearest(productId, currency) {
+  const data = JSON.stringify({
+    productId: String(productId), _currency: currency || CURRENCY,
+    country: SHIP_TO, locale: 'en_US', pdp_ext_f: '{}',
+  });
+  let j = await pdpCall(data, await tokenFor(PDP_HOST));
+  if (j && String(j.ret).includes('TOKEN_EMPTY')) j = await pdpCall(data, await tokenFor(PDP_HOST));
+  if (!j || /PUNISH|VALIDATE|RGV587/i.test(String(j.ret))) {
+    log('pdp:', j ? String(j.ret) : 'no response');
+    return null;
+  }
+  // Scan for price-ish numbers rather than pinning one path: the sku map's shape is
+  // undocumented and has moved before. Guarded by a sanity band so a random id or a
+  // cent value cannot become a price.
+  const nums = [];
+  JSON.stringify(j).replace(/"(?:formattedPrice|minPrice|maxPrice|skuVal|actSkuCalPrice|skuCalPrice)"\s*:\s*"?([\d.,]+)"?/g,
+    (m, n) => { const v = parseFloat(String(n).replace(/,/g, '')); if (v > 0 && v < 1e6) nums.push(v); return m; });
+  if (!nums.length) return null;
+  return Math.max(...nums);
+}
+
+// Exposed for a one-line check from the service-worker console:
+//   await self.__alibadgePdp('32930388619', 'USD')
+self.__alibadgePdp = (productId, currency = 'USD') => pdpDearest(productId, currency);
+
 // The cookie is the USER's — it drives the currency they see on aliexpress.com. Set
 // it for the search, then put back exactly what was there, including absent.
 async function withStoreCurrency(currency, fn) {
@@ -337,6 +393,35 @@ async function lookup(extraction, pageOrigin) {
   // Cache the SEARCH, not the verdict — see judge(). Empty results are the one
   // transient case that reaches here (every other failure returned early), and
   // caching those turned one bad minute into a week of silence.
+  // Upgrade the WINNER's price to its dearest variant, once, before caching — so the
+  // corrected number is what gets stored and a cache hit never re-issues the call.
+  // Done here rather than in judge() for exactly that reason: judge() runs on every
+  // cached page view, and a per-view pdp call multiplies punish risk for nothing.
+  if (results.length) {
+    const provisional = decide(extraction, results, null);
+    if (provisional.winner) {
+      const dearest = await pdpDearest(provisional.winner.productId, extraction.currency);
+      const current = parsePrice(provisional.winner.price);
+      // Sanity band, not just "bigger". The scan takes a max over every price-shaped
+      // field in an undocumented payload, so a bundle or coupon figure could ride in.
+      // A variant of the SAME listing within 50x of the cheapest is plausible; beyond
+      // that it is probably not a variant, and quietly deflating the ratio would hide
+      // a real dropshipper rather than protect anyone.
+      const plausible = dearest != null && current != null
+        && dearest >= current && dearest <= current * 50;
+      if (dearest != null && !plausible) log(`pdp: rejected ${dearest} against ${current} — out of band`);
+      if (plausible) {
+        const id = provisional.winner.productId;
+        results = results.map((r) => (r.productId === id
+          ? { ...r, price: dearest, currency: extraction.currency, basis: 'dearest' }
+          : r));
+        log(`pdp: winner ${id} ${current} -> ${dearest} ${extraction.currency} (dearest variant)`);
+      } else {
+        log('pdp: no dearest price, markup stays an upper bound');
+      }
+    }
+  }
+
   if (results.length) {
     await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], { fileId, results });
   } else {
@@ -361,6 +446,11 @@ async function judge(extraction, found) {
     render: verdict.render,
     reasons: verdict.reasons,
     note: verdict.note || null,
+    // Derived, never asserted. A hardcoded basis string is what let the receipt claim
+    // 'dearest variant' for a whole period after the code stopped doing that.
+    priceBasis: verdict.winner && verdict.winner.basis === 'dearest'
+      ? 'matched listing, dearest variant'
+      : 'matched listing, cheapest variant — markup is an upper bound',
     searchUrl: `https://www.aliexpress.com/w/wholesale-.html?isNewImageSearch=y&filename=${encodeURIComponent(fileId)}`,
   };
   if (verdict.winner) {
