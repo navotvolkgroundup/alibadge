@@ -25,11 +25,18 @@ src/worker.js      all network + all chrome.* ; the two AliExpress calls
 src/content.js     extract, render, teardown, dismiss. No imports (content scripts can't)
 src/receipt.js     the shareable PNG, drawn on a canvas. Loaded BEFORE content.js so they
                    share the isolated world's scope
+test/e2e.spec.js   playwright: real page → real decide() → real badge, no network
 preview.html       receipt design harness (see below)
 smoke.js           runs the worker pipeline outside Chrome: bun smoke.js
 ```
 
-`bun test` for the logic. `bun smoke.js` for the live pipeline. For the receipt design:
+`bun test` for the logic (33 cases). `bunx playwright test` for extraction → `decide()` →
+badge in a real browser with no network: `page.route` serves the fixtures and `decide()`
+is called through an exposed binding, so the policy is the real one rather than a stub.
+The hard-negative case asserts `reasons` contains `ratio_implausible` — a DOM-absence
+assertion alone would pass with `brandGuard` deleted.
+
+`bun smoke.js` for the live pipeline. For the receipt design:
 
 ```
 python3 -m http.server 8777   # then open http://127.0.0.1:8777/preview.html
@@ -110,8 +117,5 @@ with prices and sold counts.
   gets `null`, falling back to AliExpress's own result rank — which is itself a visual
   similarity signal, with the brand guard and markup floor still gating. Add blockhash
   when rank measurably admits wrong matches.
-- **Playwright E2E**, both cases from the design doc — badge fires on a dropship fixture,
-  and a hard-negative fixture asserting `decide().reasons` contains `brand_guard`. A
-  DOM-absence assertion would pass with the guard deleted, so it must assert the reason.
 - **Design tokens.** Currently a monospace stack in the badge CSS. The doc calls for a
   named display face with tabular numerals — deliberately not `system-ui`.
