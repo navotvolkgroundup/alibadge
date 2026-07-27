@@ -17,9 +17,9 @@
   #err { color: #fff; padding: 12px 20px; }
 </style>
 <div class="row">
-  <div class="half light"><div class="lbl">light timeline</div><img id="a"></div>
-  <div class="half dark"><div class="lbl">dark timeline</div><img id="b"></div>
+  <div class="half dark"><div class="lbl">the receipt, copied to your clipboard</div><img id="a"></div>
 </div>
+<img id="b" hidden>
 <div id="err"></div>
 <!-- Cache-busted: an unversioned src had the browser serving a stale receipt.js and
      silently showing the previous layout as if the edit had not applied. -->
@@ -27,27 +27,23 @@
 <script>
 // Real values measured on 2026-07-26, not invented.
 const DATA = {
+  // The measured caleb-modern receipt, 2026-07-27: dHash distance 0 photo match, dearest
+  // variant pricing, importer signature present. The numbers are not illustrative.
   storeHost: 'warmlydecor.com',
-  storeTitle: 'Royal Vintage Cutlery Set — 24 piece',
-  storePrice: 84.95,
+  storeTitle: 'Caleb - Modern Cutlery Set',
+  storePrice: 73.95,
   currency: 'USD',
-  storeImage: 'https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1410527736.jpg',
-  aliTitle: 'Luxury Gold Vintage Western Gold-Plated Stainless Steel Cutlery Set',
-  aliPrice: 9.72,
-  // In the extension these are data URLs produced by the worker (thumb()), because
-  // alicdn serves images with no ACAO in a browser context and would taint the
-  // canvas. The preview uses a same-origin file to stand in for that.
-  aliImage: 'fixtures/ali-thumb.jpg',
-  aliUrl: 'https://www.aliexpress.com/item/32930388619.html',
-  sold: '180 sold',
-  markup: 774,
-  priceBasis: 'matched listing, cheapest variant — markup is an upper bound',
-  // LAYOUT PROBE, not a measured field for this store: warmlydecor publishes its own
-  // name as vendor and no brand token, so it would carry no caveat in reality. Set
-  // here only to check the note line renders and clips instead of overflowing.
-  note: 'otterbox is a brand name — listing may be a copy',
+  storeImage: 'fixtures/caleb-store.jpg',
+  aliTitle: 'Gold Spoon Knife Set Gold Cutlery Knives Sets Wedding Tableware Forks Knives Spoons Silverware Travel Cutlery Set Dropshipping',
+  aliPrice: 18.24,
+  aliImage: 'fixtures/caleb-ali.jpg',
+  aliUrl: 'https://www.aliexpress.com/item/33026409282.html',
+  sold: '15 sold',
+  markup: 305,
+  priceBasis: 'matched listing, dearest variant',
+  note: null,
   shipTo: 'US',
-  capturedAt: '2026-07-26',
+  capturedAt: '2026-07-27',
 };
 (async () => {
   try {
@@ -56,6 +52,11 @@ const DATA = {
     const url = URL.createObjectURL(blob);
     a.src = url; b.src = url;
     err.textContent = `rendered ${Math.round(blob.size / 1024)} KB`;
+    // ?save downloads the PNG so it can be used as a Web Store screenshot.
+    if (location.search.includes('save')) {
+      const dl = document.createElement('a');
+      dl.href = url; dl.download = 'alibadge-receipt.png'; dl.click();
+    }
   } catch (e) {
     err.textContent = 'FAILED: ' + e;
   }

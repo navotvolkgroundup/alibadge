@@ -12,16 +12,26 @@ function paint(on) {
     : 'Disabled. Nothing is uploaded.';
 }
 
-chrome.storage.local.get('consent').then((r) => paint(r.consent === true));
+// Tolerate being opened outside the extension (file://, a static server, a screenshot
+// harness): chrome.storage is absent there and an unhandled throw leaves the panel
+// stuck on "checking…".
+const store = (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) || null;
+
+if (store) store.get('consent').then((r) => paint(r.consent === true), () => paint(false));
+else {
+  paint(false);
+  state.textContent = 'Open this from the extension to change the setting.';
+}
 
 box.addEventListener('change', async () => {
+  if (!store) { box.checked = false; return; }
   const on = box.checked;
-  await chrome.storage.local.set({ consent: on });
+  await store.set({ consent: on });
   // Turning it OFF drops everything already fetched, so a withdrawal is not merely
   // prospective — the cached marketplace results go too.
   if (!on) {
-    const keys = Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith('c:'));
-    if (keys.length) await chrome.storage.local.remove(keys);
+    const keys = Object.keys(await store.get(null)).filter((k) => k.startsWith('c:'));
+    if (keys.length) await store.remove(keys);
   }
   paint(on);
 });

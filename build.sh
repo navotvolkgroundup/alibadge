@@ -8,7 +8,8 @@ cd "$(dirname "$0")"
 command -v bun >/dev/null && { bun test src; bunx playwright test; }
 
 OUT="dist/alibadge-$(python3 -c 'import json;print(json.load(open("manifest.json"))["version"])').zip"
-rm -rf dist && mkdir -p dist
+# Keep dist/store — the Web Store screenshots live there and are slow to regenerate.
+rm -f dist/*.zip && mkdir -p dist
 zip -qr "$OUT" \
   manifest.json rules.json options.html options.js PRIVACY.md \
   src/lib.js src/worker.js src/content.js src/receipt.js \
