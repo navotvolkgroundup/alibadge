@@ -13,13 +13,33 @@ const rows = JSON.parse(src === '-' ? await Bun.stdin.text() : await Bun.file(sr
 // Deterministic split, so re-running never reshuffles what counts as held-out.
 const half = (id) => (md5(id).charCodeAt(0) % 2 === 0 ? 'tune' : 'holdout');
 
+// Two producers, two shapes:
+//   worker  (__alibadgeLabelset) — already ran the real decide(); rows carry `render`
+//   browser (raw candidate harvest) — rows carry `cands`, decide() runs here
+// The worker shape is the one that can actually be produced (bun and page context
+// both get rate-punished), so it is the primary path.
 const scored = rows.map((r) => {
+  if (r.render) {
+    return {
+      id: r.id, bucket: r.bucket, half: half(r.id), fp: (r.fp || []).length > 0,
+      outcome: r.reasons && r.reasons.length ? r.reasons[0] : 'ok',
+      render: r.render, reasons: r.reasons || [], note: r.note || null,
+      storePrice: r.price, storeCur: r.currency,
+      aliPrice: r.aliPrice ?? null, aliCur: r.aliCurrency ?? null, aliTitle: r.aliTitle ?? null,
+      ratio: r.aliPrice && r.aliCurrency === r.currency ? +(r.price / r.aliPrice).toFixed(2) : null,
+      markup: r.markup ?? null,
+      // Plumbing means the search returned something to judge, whatever the verdict.
+      plumbed: !(r.reasons || []).some((x) =>
+        /^(no_results|punished|upload_failed|image_fetch_failed|rate_capped|harness_error|worker_error)/.test(x)),
+    };
+  }
   const extraction = {
     url: `https://${r.host}/products/x`, host: r.host, title: r.title,
     vendor: r.vendor, price: r.price, currency: r.currency, image: r.image,
   };
   const cands = (r.cands || []).map((c) => ({ ...c }));
-  const v = cands.length ? decide(extraction, cands, null) : { render: 'link-only', reasons: [r.outcome || 'no_results'], winner: null };
+  const v = cands.length ? decide(extraction, cands, null)
+    : { render: 'link-only', reasons: [r.outcome || 'no_results'], winner: null };
   const ali = v.winner ? parsePrice(v.winner.price) : null;
   return {
     id: r.id, bucket: r.bucket, half: half(r.id), fp: (r.fp || []).length > 0,
@@ -29,7 +49,7 @@ const scored = rows.map((r) => {
     aliPrice: ali, aliCur: v.winner ? v.winner.currency : null,
     aliTitle: v.winner ? v.winner.title : null,
     ratio: ali && v.winner && v.winner.currency === r.currency ? +(r.price / ali).toFixed(2) : null,
-    n: r.n ?? 0,
+    plumbed: (r.n ?? 0) > 0,
   };
 });
 
@@ -47,7 +67,7 @@ function report(rowsIn, label) {
     const full = g.filter((r) => r.render === 'full').length;
     const link = g.filter((r) => r.render === 'link-only').length;
     const none = g.filter((r) => r.render === 'none').length;
-    const plumb = g.filter((r) => r.outcome === 'ok' && r.n > 0).length;
+    const plumb = g.filter((r) => r.plumbed).length;
     console.log(`${b.padEnd(10)} ${String(g.length).padStart(2)}  ${String(full).padStart(4)}  ` +
       `${String(link).padStart(4)}  ${String(none).padStart(4)}   ${plumb}/${g.length} ${pct(plumb, g.length)}`);
   }
