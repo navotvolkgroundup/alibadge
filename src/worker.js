@@ -426,7 +426,9 @@ async function judge(extraction, found) {
 // measurement grades shipped behaviour rather than a parallel implementation.
 self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest') => {
   const items = await (await fetch(itemsUrl)).json();
+  console.log(`[labelset] ${items.length} items loaded, starting`);
   const out = [];
+  let postOk = true;
   for (const [n, it] of items.entries()) {
     const extraction = {
       url: `https://${it.host}/products/x`, host: it.host, title: it.title,
@@ -448,12 +450,24 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
     console.log(`[labelset] ${n + 1}/${items.length} ${it.bucket} ${v.render} ` +
       `${(v.reasons || []).join(',')} ${it.id}`);
     // Post incrementally: a punish partway through must not cost the earlier items.
-    try {
-      await fetch(postTo, { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(out) });
-    } catch {}
+    // NOT swallowed — a silently failing POST is indistinguishable from a run that
+    // never started, which is exactly the confusion it caused the first time.
+    if (postOk) {
+      try {
+        const r = await fetch(postTo, { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(out) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+      } catch (e) {
+        postOk = false;
+        console.warn(`[labelset] POST to ${postTo} failed (${String(e).slice(0, 80)}) — ` +
+          'continuing, and the full JSON is logged at the end. Copy it from there.');
+      }
+    }
   }
   console.log('[labelset] done,', out.length, 'items');
+  // Always logged, so the measurement survives a dead server or a blocked
+  // private-network request. Right-click → Copy string contents.
+  console.log('[labelset] JSON:\n' + JSON.stringify(out));
   return out;
 };
 

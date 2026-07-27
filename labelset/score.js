@@ -5,8 +5,10 @@
 // Run: bun labelset/score.js labelset/harvest.json
 import { decide, md5, parsePrice } from '../src/lib.js';
 
-const path = process.argv[2] || 'labelset/harvest.json';
-const rows = JSON.parse(await Bun.file(path).text());
+// Either a file, or the JSON the worker logs when the POST is blocked:
+//   pbpaste | bun labelset/score.js -
+const src = process.argv[2] || 'labelset/harvest.json';
+const rows = JSON.parse(src === '-' ? await Bun.stdin.text() : await Bun.file(src).text());
 
 // Deterministic split, so re-running never reshuffles what counts as held-out.
 const half = (id) => (md5(id).charCodeAt(0) % 2 === 0 ? 'tune' : 'holdout');
