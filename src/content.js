@@ -9,6 +9,12 @@
   const FALLBACK_BASIS = 'matched listing, cheapest variant — markup is an upper bound';
   const HOST = location.hostname;
 
+  // When THIS script was injected. Compared against the extension's last update: if
+  // the extension was updated after injection, this code is stale and anything it
+  // renders is from a build that no longer exists. See worker.js onInstalled.
+  const INJECTED_AT = Date.now();
+  let stale = false;
+
   let generation = 0;
   let badge = null;
   let debug = true; // see worker.js — on by default for unpacked builds
@@ -264,6 +270,12 @@
 
   async function render(gen, extraction, verdict) {
     if (gen !== generation) return log('stale verdict discarded');
+    const upd = await chrome.storage.local.get('updatedAt').catch(() => ({}));
+    if (upd && upd.updatedAt && upd.updatedAt > INJECTED_AT) {
+      stale = true;
+      console.warn('[alibadge] STALE: the extension was reloaded after this page ' +
+        'loaded, so this script is old code. Reload the PAGE. Receipt disabled.');
+    }
     if (!verdict || verdict.render === 'none') {
       console.log('[alibadge] SILENT —', ((verdict && verdict.reasons) || ['no response']).join(', '));
       return;
@@ -295,8 +307,13 @@
       $('[data-sub]').textContent = verdict.note
         ? `${verdict.note} · excludes shipping · ${verdict.capturedAt}`
         : `excludes shipping · ${verdict.shipTo}/${verdict.aliCurrency} · ${verdict.capturedAt}`;
+      // A receipt from stale code is a wrong artifact, and this one is meant to be
+      // posted publicly — so refuse rather than render something unreproducible.
       $('[data-copy]').hidden = false;
-      $('[data-copy]').onclick = () => copyReceipt(extraction, verdict, $);
+      $('[data-copy]').textContent = stale ? 'reload page first' : 'copy receipt';
+      $('[data-copy]').onclick = () => (stale
+        ? console.warn('[alibadge] refusing: stale content script, reload the page')
+        : copyReceipt(extraction, verdict, $));
     }
 
     const fr = await ask({ type: 'firstRunSeen' });

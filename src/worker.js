@@ -32,6 +32,15 @@ chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !
 const log = (...a) => debug && console.log('[alibadge]', ...a);
 console.log('[alibadge] worker alive');
 
+// Reloading an extension does NOT re-inject content scripts into open tabs: the old
+// script keeps running with the old code and its already-computed verdict. That
+// produced a receipt carrying a caveat the shipped logic cannot generate, a basis
+// string deleted two commits earlier, and yesterday's capture date — all of it real
+// output from stale code. Stamp the update time so a stale page can notice.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.set({ updatedAt: Date.now() });
+});
+
 // --- serial queue + token bucket --------------------------------------------
 // A serial queue alone does not limit requests per minute, which is what the
 // marketplace's rate limiting actually counts.

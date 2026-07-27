@@ -110,6 +110,13 @@ with prices and sold counts.
   and the receipt says so. **The basis string is DERIVED from the winner, never hardcoded** — a constant
   is exactly what let the receipt print "dearest variant" for a whole period after the
   code producing dearest prices was deleted. There is a Playwright test on this.
+- **Reloading the extension does NOT reload content scripts in open tabs.** The old
+  script keeps running with the old code and its already-computed verdict. This produced
+  a receipt with a caveat the shipped logic cannot generate, a basis string deleted two
+  commits earlier, and the previous day's capture date — all genuine output from code
+  that no longer existed. `onInstalled` stamps `updatedAt`; a content script injected
+  before that warns and disables the receipt button. **Reload the PAGE, not just the
+  extension.**
 - **Don't add the `tabs` permission.** `changeInfo.url` is populated already because
   `host_permissions` covers the tab.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
