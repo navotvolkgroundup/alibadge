@@ -21,7 +21,7 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // Bump to invalidate every existing entry. Entries now hold search RESULTS, not
 // verdicts, so this only needs bumping when the result SHAPE changes — never for a
 // change to decide().
-const CACHE_V = 'v3';
+const CACHE_V = 'v4';  // v4: results carry a hash distance `d`; v3 entries had no gate
 const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
 const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
 const HOURLY_CAP = 120;
@@ -568,10 +568,14 @@ async function lookup(extraction, pageOrigin) {
   // hit is still gated and a threshold change takes effect without re-fetching images.
   if (results.length) {
     const gate = await gateFor(buf, results);
-    if (gate) {
-      const byId = new Map(gate.map((x) => [x.item.productId, x.distance]));
-      results = results.map((r) => ({ ...r, d: byId.has(r.productId) ? byId.get(r.productId) : null }));
-    }
+    const byId = new Map((gate || []).map((x) => [x.item.productId, x.distance]));
+    // null, never Infinity: Infinity becomes null through JSON anyway, and writing the
+    // sentinel explicitly keeps in-memory and cached behaviour identical.
+    results = results.map((r) => {
+      const d = byId.get(r.productId);
+      return { ...r, d: Number.isFinite(d) ? d : null };
+    });
+    if (!gate) log('gate: store image could not be hashed — nothing can pass');
   }
 
   // Upgrade the WINNER's price to its dearest variant, once, before caching — so the
@@ -615,11 +619,22 @@ async function lookup(extraction, pageOrigin) {
 // a decision-logic fix has been invisible because a stale verdict was replayed
 // from storage, and bumping CACHE_V each time only defers the next occurrence.
 // Re-deciding on every read costs one function call and makes that class impossible.
-// Rebuild the gate from distances stored on the cached results. Candidates that were
-// never hashed (beyond GATE_CANDIDATES, or whose image fetch failed) carry null and
-// cannot win: a missing hash is not evidence of a match.
+// ALWAYS returns a gate. Never null.
+//
+// It used to return null when no candidate carried a distance, which silently fell back
+// to AliExpress's own rank — ungated — in exactly the two situations where the gate is
+// most needed:
+//   1. The STORE image could not be hashed at all.
+//   2. Every candidate image fetch failed. Note Infinity does not survive the cache:
+//      JSON.stringify(Infinity) is "null", so a cache round-trip erased every distance.
+// A blocked CDN is enough to trigger (2) — the candidate images come from
+// aliexpress-media.com, which ad blockers routinely block.
+//
+// MEASURED consequence: i-cell.co.il rendered +570% against a licensed Otterbox whose
+// closest gallery image is 21 bits away. The gate was correct and simply absent.
+//
+// So no distance means no pass. The gate is mandatory, and its absence is silence.
 function gateFromStored(results) {
-  if (!results.some((r) => r.d != null)) return null;
   return results.map((item) => ({
     item,
     distance: item.d == null ? Infinity : item.d,

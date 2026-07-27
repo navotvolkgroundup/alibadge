@@ -395,3 +395,16 @@ test('decide still badges when the gate confirms the same photograph', () => {
   expect(d.render).toBe('full');
   expect(d.reasons).toEqual([]);
 });
+
+test('an absent gate must reject, never fall back to rank', () => {
+  // MEASURED failure: i-cell.co.il rendered +570% against a licensed Otterbox whose
+  // closest gallery image is 21 bits away. The gate was right and simply absent —
+  // gateFromStored returned null when no candidate carried a distance, and decide()
+  // fell back to AliExpress's rank. An empty gate array must mean nothing passes.
+  const results = [{ productId: '1', price: '$44.60', currency: 'ILS', title: 'Magnetic Folio Case' }];
+  const emptyGate = results.map((item) => ({ item, distance: Infinity, passes: false }));
+  const d = decide({ price: 299, currency: 'ILS', host: 'www.i-cell.co.il', vendor: 'iCell',
+    title: 'כיסוי Otterbox ל iPad Air 11' }, results, emptyGate);
+  expect(d.render).toBe('link-only');
+  expect(d.reasons).toContain('no_passing_match');
+});

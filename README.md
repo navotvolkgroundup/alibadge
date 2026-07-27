@@ -103,6 +103,14 @@ with prices and sold counts.
   to `parsePrice` returns **80**, a 10x overstatement in the accusing direction. And
   `originalPrice` is the struck-through figure. Only `salePriceString` is safe, and
   `dearestFromSkuMap()` in lib.js is tested against a verbatim live entry for both.
+- **The gate must FAIL CLOSED.** `gateFromStored()` never returns null. It used to, when
+  no candidate carried a distance, and `decide()` then fell back to AliExpress's rank —
+  ungated — in exactly the two cases where the gate matters most: the store image failing
+  to hash, and every candidate image fetch failing. Note `JSON.stringify(Infinity)` is
+  `"null"`, so a cache round-trip erased every distance on its own. An ad blocker is
+  enough to trigger it, since candidate images come from `aliexpress-media.com`.
+  MEASURED: i-cell.co.il rendered +570% against a licensed Otterbox whose closest gallery
+  image is **21 bits** away. No distance now means no pass.
 - **Hash the ORIGINAL alicdn image, not the thumbnail.** Result images arrive as
   `...jpg_220x220q75.jpg_.webp`; a padded 220px thumbnail scores far from a full-size
   store photo even when the two are the same image. `stripAlicdnSize()` exists for this.
