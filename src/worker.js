@@ -629,7 +629,7 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
 //   await self.__alibadgeProbeUrl('https://warmlydecor.com/products/royal-vintage-cutlery-set')
 // Rebuilds the extraction from the page the way content.js does (og:price first, then
 // products.js), then calls the REAL lookup so the reasons are the shipped ones.
-self.__alibadgeProbeUrl = async (url) => {
+self.__alibadgeProbeUrl = async (url, force = false) => {
   const u = new URL(url);
   const html = await (await fetch(url)).text();
   const jsonUrl = u.origin + u.pathname.replace(/\/$/, '') + '.js';
@@ -650,6 +650,16 @@ self.__alibadgeProbeUrl = async (url) => {
     url, host: u.hostname, title: p.title || '', vendor: p.vendor || '',
     price, currency, image: img.startsWith('//') ? 'https:' + img : img,
   };
+  // force skips the cache. Needed because entries written before the currency cookie
+  // hold ILS-priced candidates, and before the pdp lookup hold no dearest flag — so a
+  // cache hit can answer with numbers the current code would never produce.
+  if (force) {
+    const k = urlCacheKey(url);
+    const keys = Object.keys(await chrome.storage.local.get(null))
+      .filter((x) => x.startsWith('c:') && (!k || x.includes(k)));
+    await chrome.storage.local.remove(keys);
+    log(`probe: cleared ${keys.length} cache entries`);
+  }
   const verdict = await enqueue(() => lookup(extraction, u.origin));
   return {
     extraction,
