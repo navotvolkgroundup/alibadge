@@ -28,9 +28,11 @@ src/receipt.js     the shareable PNG, drawn on a canvas. Loaded BEFORE content.j
 test/e2e.spec.js   playwright: real page → real decide() → real badge, no network
 preview.html       receipt design harness (see below)
 smoke.js           runs the worker pipeline outside Chrome: bun smoke.js
+labelset/          premise-2 measurement: probe.js builds the set, the worker runs it,
+                   score.js grades it. See "Measuring premise 2" below
 ```
 
-`bun test` for the logic (33 cases). `bunx playwright test` for extraction → `decide()` →
+`bun test src` for the logic (33 cases — scope it to `src`, or it globs the Playwright spec). `bunx playwright test` for extraction → `decide()` →
 badge in a real browser with no network: `page.route` serves the fixtures and `decide()`
 is called through an exposed binding, so the policy is the real one rather than a stub.
 The hard-negative case asserts `reasons` contains `ratio_implausible` — a DOM-absence
@@ -119,3 +121,42 @@ with prices and sold counts.
   when rank measurably admits wrong matches.
 - **Design tokens.** Currently a monospace stack in the badge CSS. The doc calls for a
   named display face with tabular numerals — deliberately not `system-ui`.
+
+## Measuring premise 2
+
+The labelled set is three buckets — `dropship` (expected true positives), `easy_neg`
+(real brands with no plausible AliExpress presence) and `hard_neg` (real brands **with**
+known AliExpress counterfeits). The third is the point: without it the false-positive
+number only measures the easy case.
+
+```
+bun labelset/probe.js          # candidates -> probed.json (free, no AliExpress calls)
+python3 labelset/serve.py      # serves the set, receives harvested verdicts
+```
+
+Then **from the extension's service-worker console** (not bun — see below):
+
+```
+await self.__alibadgeLabelset('http://127.0.0.1:8899/_items.json')
+```
+
+```
+bun labelset/score.js labelset/harvest.json
+```
+
+**Why it cannot run from bun.** `labelset/run.js` is the bun version and it does work —
+for about three items. Then `/fn/search-pc/index` rate-punishes every retry, and
+`mtop.aliexpress.pdp.pc.query` is punished on the *first* call
+(`FAIL_SYS_USER_VALIDATE` → `_____tmd_____/punish`). Inside a loaded extension both
+calls work. `run.js` is kept because it is the fastest way to check the plumbing, not
+because it can produce the number.
+
+**A consequence worth knowing:** because pdp.pc.query never answered outside the
+extension, the dearest-variant re-price in `worker.js` is **unverified**. The live
+badge that appeared to prove it was a case where store and results were both ILS, so
+no conversion happened. `repriced 0/3` in the worker console means it is still failing.
+
+`probe.js` also fingerprints each store for importer signatures (DSers SKU shapes,
+`product-image-<digits>` filenames, `My Store` vendor). That is the unbiased labeller
+the design doc asks for — it keys on SKU and filename shape, independent of photo
+reuse, so it does not select the test set on the very thing being measured.

@@ -5,7 +5,7 @@
   },
   "type": "module",
   "scripts": {
-    "test": "bun test",
+    "test": "bun test src",
     "e2e": "playwright test"
   }
 }

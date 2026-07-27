@@ -1,0 +1,544 @@
+[
+  {
+    "bucket": "dropship",
+    "host": "warmlydecor.com",
+    "fp": [
+      "dsers_image",
+      "dsers_sku"
+    ],
+    "products": [
+      {
+        "handle": "royal-vintage-cutlery-set",
+        "title": "Royal Vintage Cutlery Set",
+        "vendor": "Warmly",
+        "price": 84.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1410527736.jpg?v=1601416180"
+      },
+      {
+        "handle": "matte-black-cutlery-set",
+        "title": "Matte Black Cutlery Set",
+        "vendor": "Warmly",
+        "price": 70.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1543659878.jpg?v=1601416233"
+      },
+      {
+        "handle": "modern-30-piece-cutlery-set",
+        "title": "Artiza - Modern Cutlery Set",
+        "vendor": "Warmly",
+        "price": 78.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1483131470.jpg?v=1600963180"
+      },
+      {
+        "handle": "caleb-modern-cutlery-set",
+        "title": "Caleb - Modern Cutlery Set",
+        "vendor": "Warmly",
+        "price": 73.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1519442578.jpg?v=1608726075"
+      },
+      {
+        "handle": "arima-set-of-stainless-steel-cutlery",
+        "title": "Arima - Set of Stainless Steel Cutlery",
+        "vendor": "Warmly",
+        "price": 74.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1520980320.jpg?v=1608728972"
+      },
+      {
+        "handle": "aiora-modern-cutlery-set",
+        "title": "Aiora - Modern Cutlery Set",
+        "vendor": "Warmly",
+        "price": 78.95,
+        "image": "https://cdn.shopify.com/s/files/1/0046/5702/1041/products/product-image-1424557234.jpg?v=1608730260"
+      }
+    ]
+  },
+  {
+    "bucket": "dropship",
+    "host": "petclever.net",
+    "fp": [],
+    "products": [
+      {
+        "handle": "7-in-1-usb-cat-laser-toy-rechargeable-interactive-pet-teaser",
+        "title": "7-in-1 USB Cat Laser Toy – Rechargeable Interactive Pet Teaser",
+        "vendor": "Pet Clever",
+        "price": 17.95,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/files/7-in-1-usb-cat-laser-toy-rechargeable-interactive-pet-teaser-869347.jpg?v=1779052190"
+      },
+      {
+        "handle": "interactive-7-in-1-usb-rechargeable-cat-dog-teaser-toy-with-led-light",
+        "title": "Interactive 7-in-1 USB Rechargeable Cat & Dog Teaser Toy with LED Light🐾",
+        "vendor": "Pet Clever",
+        "price": 17.95,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/files/interactive-7-in-1-usb-rechargeable-cat-dog-teaser-toy-with-led-light-671374.jpg?v=1779052165"
+      },
+      {
+        "handle": "pacifier-shape-dog-teething-chew-toy",
+        "title": "Pacifier Shape Dog Teething Chew Toy",
+        "vendor": "Pet Clever",
+        "price": 12.9,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/products/pacifier-shape-dog-teething-chew-toy-202092.jpg?v=1573975229"
+      },
+      {
+        "handle": "funny-devils-mouth-squeaky-toy",
+        "title": "Funny Devil's Mouth Squeaky Toy",
+        "vendor": "Pet Clever",
+        "price": 14.4,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/products/funny-devils-mouth-squeaky-toy-788757.jpg?v=1573989087"
+      },
+      {
+        "handle": "dog-car-barrier-vehicle-pet-barrier-backseat-mesh-dog-car-divider-net-with-adjusting-rope",
+        "title": "Dog Car Barrier Vehicle Pet Barrier Backseat Mesh Dog Car Divider Net with Adjusting Rope",
+        "vendor": "Pet Clever",
+        "price": 92.95,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/files/dog-car-barrier-vehicle-pet-barrier-backseat-mesh-dog-car-divider-net-with-adjusting-rope-394465.jpg?v=1777053126"
+      },
+      {
+        "handle": "dog-net-for-car-divider-pet-barrier-with-mesh-organizer",
+        "title": "Dog Net for Car Divider Pet Barrier with Mesh Organizer",
+        "vendor": "Pet Clever",
+        "price": 49.95,
+        "image": "https://cdn.shopify.com/s/files/1/0925/5048/files/dog-net-for-car-divider-pet-barrier-with-mesh-organizer-581668.jpg?v=1777053063"
+      }
+    ]
+  },
+  {
+    "bucket": "easy_neg",
+    "host": "deathwishcoffee.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "sidekick-cocktail-shaker",
+        "title": "Sidekick Cocktail Shaker",
+        "vendor": "Kocreators",
+        "price": 25,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_November2024_Product_Shaker_Front_Web_1.jpg?v=1732117924"
+      },
+      {
+        "handle": "snow-daze-soda-can-glass-set",
+        "title": "Snow Daze Soda Can Glass Set",
+        "vendor": "Planet Apparel",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_November2024_Product_SodaGlasses_Web3_1.jpg?v=1732117767"
+      },
+      {
+        "handle": "peppermint-mocha-kitchen-set",
+        "title": "Peppermint Mocha Kitchen Set",
+        "vendor": "Planet Apparel",
+        "price": 30,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_November2024_Product_TeaTowelSet_Web.jpg?v=1763042076"
+      },
+      {
+        "handle": "deck-the-skulls-ornament-set",
+        "title": "Deck the Skulls Ornament Set",
+        "vendor": "BAMKO",
+        "price": 20,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_November2025_Product_Ornaments_Front_Web.jpg?v=1763041020"
+      },
+      {
+        "handle": "new-society-tee",
+        "title": "Society Insignia Tee",
+        "vendor": "Sportiqe",
+        "price": 30,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_June2026_Product_TShirt_DWCSportique_Front_EA.jpg?v=1784576357"
+      },
+      {
+        "handle": "secret-stash-satchel",
+        "title": "Secret Stash Satchel",
+        "vendor": "Planet Apparel",
+        "price": 25,
+        "image": "https://cdn.shopify.com/s/files/1/0271/7209/files/DeathWishCoffee_July2026_Product_BikeBag_Front_Web.jpg?v=1783960827"
+      }
+    ]
+  },
+  {
+    "bucket": "easy_neg",
+    "host": "hedleyandbennett.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "peanuts-beagle-scouts-essential-apron",
+        "title": "PEANUTS® Beagle Scouts Essential Apron",
+        "vendor": "Hedley & Bennett",
+        "price": 120,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Peanuts-Camping-Beagle-Scouts-Essential-Apron_00062-Square1.jpg?v=1784843560"
+      },
+      {
+        "handle": "marvels-spider-man-x-h-b-essential-apron",
+        "title": "Marvel's Spider-man x H&B Essential Apron",
+        "vendor": "Hedley & Bennett",
+        "price": 120,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Spiderman-Essenital-Apron_00013-Square1.jpg?v=1784238134"
+      },
+      {
+        "handle": "marvels-venom-x-h-b-essential-apron",
+        "title": "Marvel's Venom x H&B Essential Apron",
+        "vendor": "Hedley & Bennett",
+        "price": 120,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Venom-Essenital-Apron_00020-Square1.jpg?v=1784237953"
+      },
+      {
+        "handle": "marvels-spider-man-venom-essential-apron-set",
+        "title": "Marvel's Spider-Man & Venom Essential Apron Set",
+        "vendor": "Hedley & Bennett",
+        "price": 240,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Spiderman_Venom-Essenital-Aprons_00164-Square1.jpg?v=1784590812"
+      },
+      {
+        "handle": "disneys-snow-white-pinafore-apron",
+        "title": "Disney's Snow White Pinafore Apron",
+        "vendor": "Hedley & Bennett",
+        "price": 120,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Disney-Snow-White-Pinafore_00093-Square1.jpg?v=1784065155"
+      },
+      {
+        "handle": "rifle-paper-co-mimi-smock",
+        "title": "Rifle Paper Co. Mimi Smock",
+        "vendor": "Hedley & Bennett",
+        "price": 129,
+        "image": "https://cdn.shopify.com/s/files/1/0187/0608/files/Mimi-Rifle-Paper-Co-Smock_00058-Square1.jpg?v=1783971555"
+      }
+    ]
+  },
+  {
+    "bucket": "easy_neg",
+    "host": "misen.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "pre-seasoned-carbon-steel-pan",
+        "title": "8” Pre-Seasoned Carbon Steel Pan + Glass Lid",
+        "vendor": "Misen",
+        "price": 124,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-GlassLid-PSCS-8_-Gallery-1.png?v=1784227800"
+      },
+      {
+        "handle": "pre-seasoned-carbon-steel-pan-glass-lid-8-10-12-inch",
+        "title": "8” + 10” + 12” Pre-Seasoned Carbon Steel Frying Pan + Glass Lids",
+        "vendor": "Misen",
+        "price": 429,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-Glass_Lid-PSCS-8_10_12_-Gallery-1.png?v=1784228511"
+      },
+      {
+        "handle": "pre-seasoned-carbon-steel-pan-glass-lid-10-12-inch",
+        "title": "10” + 12” Pre-Seasoned Carbon Steel 8” + 10” + 12” Pre-Seasoned Carbon Steel Frying Pan + Glass LidsPan + Glass Lids",
+        "vendor": "Misen",
+        "price": 299,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-Glass_Lid-PSCS-10_12_-Gallery-1.png?v=1784228459"
+      },
+      {
+        "handle": "pre-seasoned-carbon-steel-pan-glass-lid-12-inch",
+        "title": "12” Pre-Seasoned Carbon Steel 8” + 10” + 12” Pre-Seasoned Carbon Steel Frying Pan + Glass LidsPan + Glass Lid",
+        "vendor": "Misen",
+        "price": 154,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-Glass_Lid-PSCS-12_-Gallery-1.png?v=1784228221"
+      },
+      {
+        "handle": "pre-seasoned-carbon-steel-pan-glass-lid-10-inch",
+        "title": "10” Pre-Seasoned Carbon Steel 8” + 10” + 12” Pre-Seasoned Carbon Steel Frying Pan + Glass LidsPan + Glass Lid",
+        "vendor": "Misen",
+        "price": 139,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-Glass_Lid-PSCS-10_-Gallery-1.png?v=1784228161"
+      },
+      {
+        "handle": "misenware-6-piece-small",
+        "title": "6-Piece Misenware Small Set",
+        "vendor": "Misen",
+        "price": 59,
+        "image": "https://cdn.shopify.com/s/files/1/1186/5476/files/Misen2-Web-PDP-Misenware-Small-6-Gallery-1.png?v=1781730550"
+      }
+    ]
+  },
+  {
+    "bucket": "easy_neg",
+    "host": "greatjonesgoods.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "big-deal-saucy",
+        "title": "Big Deal & Saucy",
+        "vendor": "Great Jones",
+        "price": 190,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/files/BigDeal_Saucy.png?v=1773691933"
+      },
+      {
+        "handle": "beyond-measure-2-cup",
+        "title": "Beyond Measure 2-Cup",
+        "vendor": "Great Jones",
+        "price": 35,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/products/BEYONDMEASURE_SMALL_BLUE_0135_230208_v2.png?v=1762447508"
+      },
+      {
+        "handle": "beyond-measure-4-cup",
+        "title": "Beyond Measure 4-Cup",
+        "vendor": "Great Jones",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/products/BEYONDMEASURE_LARGE_BLUE_0131_230208_v2.png?v=1762447509"
+      },
+      {
+        "handle": "small-fry",
+        "title": "Small Fry",
+        "vendor": "Great Jones",
+        "price": 90,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/products/small_fry_45_30405_45f2b218-7de8-4c75-8788-4638aa68185b.png?v=1762440588"
+      },
+      {
+        "handle": "stud-muffin",
+        "title": "Stud Muffin",
+        "vendor": "Great Jones",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/products/Artboard1_6_2x_ca387ab4-67d9-46b8-aec9-1c42f18400ee.png?v=1762445216"
+      },
+      {
+        "handle": "sheet-show-nonstick-baking-mats-disney-and-pixar-s-ratatouille",
+        "title": "Baking Mat and Sheet Pan Set: Disney and Pixar’s Ratatouille",
+        "vendor": "Great Jones",
+        "price": 120,
+        "image": "https://cdn.shopify.com/s/files/1/0066/9312/6202/files/Blue_Blue.png?v=1762454318"
+      }
+    ]
+  },
+  {
+    "bucket": "easy_neg",
+    "host": "burrowsandhare.co.uk",
+    "fp": [],
+    "products": [
+      {
+        "handle": "burrows-hare-linen-shirt-beige-classic-comfortable",
+        "title": "Linen Shirt - Beige",
+        "vendor": "Burrows & Hare",
+        "price": 50,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/Burrows_Hare2909230791.jpg?v=1696516801"
+      },
+      {
+        "handle": "bath-oil-60ml",
+        "title": "Bath Oil - 60ml",
+        "vendor": "Olverum",
+        "price": 29.5,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/5060380380111_1.jpg?v=1700740628"
+      },
+      {
+        "handle": "ripstop-jazz-logo-cap-forest-green",
+        "title": "Ripstop Jazz Logo Cap - Forest Green",
+        "vendor": "George James",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/GJ-02.jpg?v=1784649778"
+      },
+      {
+        "handle": "ripstop-jazz-logo-cap-red",
+        "title": "Ripstop Jazz Logo Cap - Red",
+        "vendor": "George James",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/GJ-03_e212cad6-f25e-4140-a92e-9041308fff58.jpg?v=1784649832"
+      },
+      {
+        "handle": "ripstop-jazz-logo-cap-navy",
+        "title": "Ripstop Jazz Logo Cap - Navy",
+        "vendor": "George James",
+        "price": 45,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/GJ-04_d4c0fa4e-dfcf-42d3-9f80-4e734be2ead5.jpg?v=1784649855"
+      },
+      {
+        "handle": "barena-genga-shirt-nero-stylish-modern-design",
+        "title": "Genga Shirt - Nero",
+        "vendor": "Barena",
+        "price": 89,
+        "image": "https://cdn.shopify.com/s/files/1/1038/5760/files/Burrows_Hare2510230197.jpg?v=1698844341"
+      }
+    ]
+  },
+  {
+    "bucket": "hard_neg",
+    "host": "www.stanley1913.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "the-flowstate™-duo-lunchbox-8-2-qt-7-76-l",
+        "title": "The FlowState™ Duo Lunchbox | 8.2 QT",
+        "vendor": "Stanley 1913",
+        "price": 40,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheFlowstateDuoLunchBox8.2QT-BlueDreamStone-Front.png?v=1784908031"
+      },
+      {
+        "handle": "steel-cooler-storage-bins-large",
+        "title": "Steel Cooler Storage Bins | Large",
+        "vendor": "Stanley 1913",
+        "price": 25,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+      },
+      {
+        "handle": "steel-cooler-storage-bins-medium",
+        "title": "Steel Cooler Storage Bins | Medium",
+        "vendor": "Stanley 1913",
+        "price": 20,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+      },
+      {
+        "handle": "steel-cooler-storage-bins",
+        "title": "Steel Cooler Storage Bins | Small",
+        "vendor": "Stanley 1913",
+        "price": 15,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+      },
+      {
+        "handle": "everyday-camp-cup-12-oz-stanley-create",
+        "title": "Everyday Camp Cup | 12 OZ - Stanley Create",
+        "vendor": "Stanley 1913",
+        "price": 15,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheEverydayCampCup12OZ-WisteriaShine-Front.png?v=1762182338"
+      },
+      {
+        "handle": "the-everyday-tumbler-16-oz-copy",
+        "title": "The Everyday Tumbler | 16 OZ - Stanley Create",
+        "vendor": "Stanley 1913",
+        "price": 30,
+        "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheEverydayTumbler16OZ-Black2.0-Front.png?v=1762182326"
+      }
+    ]
+  },
+  {
+    "bucket": "hard_neg",
+    "host": "www.spigen.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "galaxy-watch-9-series-thin-fit-360",
+        "title": "Galaxy Watch 9 Series - Thin Fit 360",
+        "vendor": "Galaxy Watch Series",
+        "price": 29.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/title_SWi-dj_thin_fit_360_03.jpg?v=1784589016"
+      },
+      {
+        "handle": "galaxy-watch-9-series-wbf1",
+        "title": "Galaxy Watch 9 Series - WBF1",
+        "vendor": "Galaxy Watch Series",
+        "price": 24.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/title_web_galaxy_watch_9_wbf1_01.jpg?v=1784154533"
+      },
+      {
+        "handle": "galaxy-watch-9-series-modern-fit-316l-band",
+        "title": "Galaxy Watch 9 Series - Modern Fit 316L Band",
+        "vendor": "Galaxy Watch Series",
+        "price": 49.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/title_swi-dd_modern_fit_316L_01_69d7bcac-c0e7-4ba8-bf8b-d2f2f266980f.jpg?v=1784646940"
+      },
+      {
+        "handle": "galaxy-watch-9-series-bezel-tune-pro",
+        "title": "Galaxy Watch 9 Series - Bezel Tune Pro",
+        "vendor": "Galaxy Watch Series",
+        "price": 34.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/title_web_galaxy_watch_8_bezel_tune_pro_diver_01.jpg?v=1751923685"
+      },
+      {
+        "handle": "galaxy-watch-9-series-bezel-tune",
+        "title": "Galaxy Watch 9 Series - Bezel Tune",
+        "vendor": "Galaxy Watch 9 Series",
+        "price": 29.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/detail_web_galaxy_watch_8_bezel_tune_diver_06.jpg?v=1761234595"
+      },
+      {
+        "handle": "galaxy-watch-9-series-wbf0",
+        "title": "Galaxy Watch 9 Series - WBF0",
+        "vendor": "Galaxy Watch Series",
+        "price": 29.99,
+        "image": "https://cdn.shopify.com/s/files/1/0808/0067/files/title_web_galaxy_watch_8_classic_wbf0_blk_01.jpg?v=1758736206"
+      }
+    ]
+  },
+  {
+    "bucket": "hard_neg",
+    "host": "www.otterbox.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "galaxy-z-fold8-defender-series-pro-xt-case",
+        "title": "Galaxy Z Fold8 Defender Series Pro XT Case",
+        "vendor": "OtterBox",
+        "price": 89.99,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-galaxy-z-fold-6-black_89671e28-6be3-4517-aa01-53c4cfac8972.png?v=1784238335"
+      },
+      {
+        "handle": "galaxy-z-flip8-thin-flex-series-case",
+        "title": "Galaxy Z Flip8 Thin Flex Series Case",
+        "vendor": "OtterBox",
+        "price": 59.99,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/thin-flex-galaxy-z-flip-6-clear-2_a25b4b27-12a4-4ab5-a74d-3c3597c28584.png?v=1784238332"
+      },
+      {
+        "handle": "galaxy-z-fold8-ultra-defender-series-pro-xt-case",
+        "title": "Galaxy Z Fold8 Ultra Defender Series Pro XT Case",
+        "vendor": "OtterBox",
+        "price": 89.99,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-galaxy-z-fold-6-black_b3d20ca3-f0fd-42ab-b75e-5dbe14d2c5c2.png?v=1784238335"
+      },
+      {
+        "handle": "galaxy-z-fold8-defender-series-pro-xt-holster",
+        "title": "Galaxy Z Fold8 Defender Series Pro XT Holster",
+        "vendor": "OtterBox",
+        "price": 19.99,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-holster-galaxy-z-fold-5-1_4bc457ce-d2a9-472a-ba3b-935e1c936de2.png?v=1784238332"
+      },
+      {
+        "handle": "galaxy-z-fold8-ultra-defender-series-xt-and-defender-series-pro-xt-holster",
+        "title": "Galaxy Z Fold8 Ultra Defender Series XT and Defender Series Pro XT Holster",
+        "vendor": "OtterBox",
+        "price": 19.99,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-holster-galaxy-z-fold-5-1_a37c67a5-e58c-4598-96ac-f6ba1012a517.png?v=1784238332"
+      },
+      {
+        "handle": "iphone-17-symmetry-series-confetti-of-blossoms-case",
+        "title": "iPhone 17 Symmetry Series Confetti of Blossoms Case",
+        "vendor": "OtterBox",
+        "price": 30,
+        "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/symmetry-confetti-ipha25-painted-petals-1.png?v=1783447142"
+      }
+    ]
+  },
+  {
+    "bucket": "hard_neg",
+    "host": "us.anker.com",
+    "fp": [],
+    "products": [
+      {
+        "handle": "a83h1-hdmi-switch",
+        "title": "Anker HDMI Switch (2 in 1 Out, 4K HDMI)",
+        "vendor": "Anker",
+        "price": 12.99,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/Group_2147226149.png?v=1762767816"
+      },
+      {
+        "handle": "bundle-a83d20a1-a121d111",
+        "title": "Anker USB-C Hub (7-in-1) and Anker Nano Charger (45W, Smart Display, 180° Foldable)",
+        "vendor": "Anker",
+        "price": 65.98,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/Group427323643.png?v=1783824357"
+      },
+      {
+        "handle": "bundle-a1653031-a2147133",
+        "title": "Anker Nano Power Bank (22.5W, Built-In USB-C Connector) and Anker Nano Charger (30W)",
+        "vendor": "Anker",
+        "price": 46.98,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/Group427323642.png?v=1783823041"
+      },
+      {
+        "handle": "mysterybox-summer26-69",
+        "title": "Summer Heat Box",
+        "vendor": "beta-anker-us",
+        "price": 69.99,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/Frame_2121234936_5_1d68196f-7d35-4d13-9582-8a6e1e41f0c7.png?v=1782266831"
+      },
+      {
+        "handle": "mysterybox-summer26-19",
+        "title": "Summer Starter Box",
+        "vendor": "beta-anker-us",
+        "price": 19.99,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/19.99-M_c388b78f-ba02-45cb-9563-f7ba28bdc602.gif?v=1780646945"
+      },
+      {
+        "handle": "b8153011-f0",
+        "title": "Refurbished Anker <b>331</b> USB-A to Lightning Cable (Nylon)",
+        "vendor": "Anker",
+        "price": 15.99,
+        "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/6feet_2Black2-01-6feet_2Black2-011.png?v=1782815131"
+      }
+    ]
+  }
+]

@@ -412,6 +412,51 @@ async function judge(extraction, found) {
 // --- messaging ---------------------------------------------------------------
 // Every message carries a `target`, because chrome.runtime.sendMessage broadcasts
 // to the whole extension origin and any other listener would also try to reply.
+// --- labelled-set measurement ------------------------------------------------
+// Premise 2 at scale has to be measured HERE. From bun, /fn/search-pc/index worked
+// for three items then rate-punished every retry, and pdp.pc.query is punished on
+// the first call (FAIL_SYS_USER_VALIDATE) — so a non-browser harness cannot produce
+// the number. Inside a loaded extension both calls work; that is the whole reason
+// this lives in the worker instead of in labelset/run.js.
+//
+// Paste-once from the extension's service-worker console:
+//   await self.__alibadgeLabelset('http://127.0.0.1:8899/_items.json')
+//
+// Goes through the same enqueue() and the same lookup() a real page does, so the
+// measurement grades shipped behaviour rather than a parallel implementation.
+self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest') => {
+  const items = await (await fetch(itemsUrl)).json();
+  const out = [];
+  for (const [n, it] of items.entries()) {
+    const extraction = {
+      url: `https://${it.host}/products/x`, host: it.host, title: it.title,
+      vendor: it.vendor, price: it.price, currency: it.currency, image: it.image,
+    };
+    let v;
+    try {
+      v = await enqueue(() => lookup(extraction, `https://${it.host}`));
+    } catch (e) {
+      v = { render: 'none', reasons: ['harness_error'], error: String(e).slice(0, 80) };
+    }
+    out.push({
+      id: it.id, bucket: it.bucket, fp: it.fp, host: it.host, title: it.title,
+      vendor: it.vendor, price: it.price, currency: it.currency,
+      render: v.render, reasons: v.reasons || [], note: v.note || null,
+      aliPrice: v.aliPrice ?? null, aliCurrency: v.aliCurrency ?? null,
+      aliTitle: v.aliTitle ?? null, aliUrl: v.aliUrl ?? null, markup: v.markup ?? null,
+    });
+    console.log(`[labelset] ${n + 1}/${items.length} ${it.bucket} ${v.render} ` +
+      `${(v.reasons || []).join(',')} ${it.id}`);
+    // Post incrementally: a punish partway through must not cost the earlier items.
+    try {
+      await fetch(postTo, { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(out) });
+    } catch {}
+  }
+  console.log('[labelset] done,', out.length, 'items');
+  return out;
+};
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || msg.target !== 'worker') return false;
 
