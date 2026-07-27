@@ -220,13 +220,42 @@ async function pdpDearest(productId, currency) {
   const nums = [];
   JSON.stringify(j).replace(/"(?:formattedPrice|minPrice|maxPrice|skuVal|actSkuCalPrice|skuCalPrice)"\s*:\s*"?([\d.,]+)"?/g,
     (m, n) => { const v = parseFloat(String(n).replace(/,/g, '')); if (v > 0 && v < 1e6) nums.push(v); return m; });
-  if (!nums.length) return null;
+  if (!nums.length) {
+    // Was silent, which made a punish and a wrong request payload look identical.
+    log('pdp: call succeeded but no price fields matched — ret', String(j.ret));
+    return null;
+  }
   return Math.max(...nums);
 }
 
-// Exposed for a one-line check from the service-worker console:
+// Exposed for a one-line check from the service-worker console. Returns a DIAGNOSTIC
+// object, not just the price: a bare null cannot distinguish a punish from a request
+// the server accepted but did not understand, and those need opposite fixes.
 //   await self.__alibadgePdp('32930388619', 'USD')
-self.__alibadgePdp = (productId, currency = 'USD') => pdpDearest(productId, currency);
+self.__alibadgePdp = async (productId, currency = 'USD') => {
+  const data = JSON.stringify({
+    productId: String(productId), _currency: currency || CURRENCY,
+    country: SHIP_TO, locale: 'en_US', pdp_ext_f: '{}',
+  });
+  let j = await pdpCall(data, await tokenFor(PDP_HOST));
+  const firstRet = j && String(j.ret);
+  if (j && String(j.ret).includes('TOKEN_EMPTY')) j = await pdpCall(data, await tokenFor(PDP_HOST));
+  const raw = JSON.stringify(j || {});
+  const nums = [];
+  raw.replace(/"(?:formattedPrice|minPrice|maxPrice|skuVal|actSkuCalPrice|skuCalPrice)"\s*:\s*"?([\d.,]+)"?/g,
+    (m, n) => { const v = parseFloat(String(n).replace(/,/g, '')); if (v > 0 && v < 1e6) nums.push(v); return m; });
+  return {
+    firstRet,                                   // TOKEN_EMPTY on a healthy handshake
+    ret: j && j.ret,                            // SUCCESS, or FAIL_SYS_USER_VALIDATE = punished
+    punished: /PUNISH|VALIDATE|RGV587/i.test(String(j && j.ret)),
+    bytes: raw.length,                          // ~20 chars means an empty envelope
+    topKeys: j && j.data ? Object.keys(j.data).slice(0, 25) : null,
+    priceFieldsFound: nums.length,
+    dearest: nums.length ? Math.max(...nums) : null,
+    // First 600 chars, so a shape change is visible without dumping the whole payload.
+    head: raw.slice(0, 600),
+  };
+};
 
 // The cookie is the USER's — it drives the currency they see on aliexpress.com. Set
 // it for the search, then put back exactly what was there, including absent.
