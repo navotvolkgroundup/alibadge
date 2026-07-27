@@ -624,6 +624,46 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
   return out;
 };
 
+// Run the whole pipeline for one product URL from the service-worker console, so a
+// silent badge can be diagnosed without hunting the page console for a log line:
+//   await self.__alibadgeProbeUrl('https://warmlydecor.com/products/royal-vintage-cutlery-set')
+// Rebuilds the extraction from the page the way content.js does (og:price first, then
+// products.js), then calls the REAL lookup so the reasons are the shipped ones.
+self.__alibadgeProbeUrl = async (url) => {
+  const u = new URL(url);
+  const html = await (await fetch(url)).text();
+  const jsonUrl = u.origin + u.pathname.replace(/\/$/, '') + '.js';
+  const p = await (await fetch(jsonUrl)).json().catch(() => null);
+  if (!p) return { error: 'products.js not parseable at ' + jsonUrl };
+
+  const meta = (prop) => {
+    const m = new RegExp(`<meta[^>]*property=["']${prop}["'][^>]*content=["']([^"']+)`).exec(html)
+      || new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${prop}["']`).exec(html);
+    return m ? m[1] : null;
+  };
+  const ogAmt = parseFloat(String(meta('og:price:amount')).replace(/,/g, ''));
+  const price = Number.isFinite(ogAmt) && ogAmt > 0 ? ogAmt : parseInt(p.variants[0].price, 10) / 100;
+  const currency = meta('og:price:currency') || p.currency || null;
+  const img = String((p.images || [])[0] || '');
+
+  const extraction = {
+    url, host: u.hostname, title: p.title || '', vendor: p.vendor || '',
+    price, currency, image: img.startsWith('//') ? 'https:' + img : img,
+  };
+  const verdict = await enqueue(() => lookup(extraction, u.origin));
+  return {
+    extraction,
+    render: verdict.render,
+    reasons: verdict.reasons,
+    note: verdict.note || null,
+    aliPrice: verdict.aliPrice ?? null,
+    aliCurrency: verdict.aliCurrency ?? null,
+    aliTitle: verdict.aliTitle ?? null,
+    markup: verdict.markup ?? null,
+    priceBasis: verdict.priceBasis ?? null,
+  };
+};
+
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || msg.target !== 'worker') return false;
 
