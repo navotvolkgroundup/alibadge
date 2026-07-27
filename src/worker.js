@@ -101,7 +101,8 @@ async function cachePut(keys, v) {
 // `type:"POST"` in AliExpress's own JS client maps to a real POST here. The
 // default jsonp/GET transport puts the payload in the query string and caps it
 // near 8KB of base64, which silently degrades the image and wrecks match quality.
-// MTOP handshake. The first call returns FAIL_SYS_TOKEN_EMPTY and sets _m_h5_tk;
+// MTOP handshake. The first call returns FAIL_SYS_TOKEN_EMPTY (or _EXPIRED, once the
+// cookie has aged) and sets a fresh _m_h5_tk;
 // the token is the part before the "_". `recom-acs` does NOT skip this — verified
 // against a live call, contrary to an earlier note in the design doc. Reading the
 // cookie is why the `cookies` permission is required after all.
@@ -156,8 +157,10 @@ async function uploadImage(b64, currency) {
   const data = JSON.stringify({ appId: UPLOAD_APPID, params: JSON.stringify(params) });
 
   let j = await mtopCall(data, await mtopToken());
-  if (j && String(j.ret).includes('TOKEN_EMPTY')) {
-    // The failed call just set the cookie; re-read it and sign again.
+  // EXPIRED as well as EMPTY: measured a live `FAIL_SYS_TOKEN_EXOIRED` (their typo) that
+  // fell through this check and cost the item an upload with no retry.
+  if (j && /TOKEN_(EMPTY|EXPIRED|EXOIRED)/.test(String(j.ret))) {
+    // The failed call just set a fresh cookie; re-read it and sign again.
     j = await mtopCall(data, await mtopToken());
   }
   const fileId = j && j.data && j.data.fileId;
@@ -233,7 +236,7 @@ async function pdpDearest(productId, currency) {
     country: SHIP_TO, locale: 'en_US', pdp_ext_f: '{}',
   });
   let j = await pdpCall(data, await tokenFor(PDP_HOST));
-  if (j && String(j.ret).includes('TOKEN_EMPTY')) j = await pdpCall(data, await tokenFor(PDP_HOST));
+  if (j && /TOKEN_(EMPTY|EXPIRED|EXOIRED)/.test(String(j.ret))) j = await pdpCall(data, await tokenFor(PDP_HOST));
   if (!j || /PUNISH|VALIDATE|RGV587/i.test(String(j.ret))) {
     log('pdp:', j ? String(j.ret) : 'no response');
     return null;
@@ -724,7 +727,12 @@ self.__alibadgeLabelset = async (itemsUrl, fresh = false) => {
 
   for (const [n, it] of todo.entries()) {
     const extraction = {
-      url: `https://${it.host}/products/x`, host: it.host, title: it.title,
+      // The REAL product path. A constant '/products/x' gave every product on a host the
+      // same urlCacheKey, so items 2..n answered from item 1's cached results AND its
+      // gate distances — three warmlydecor sets and two Misen lids inherited verdicts
+      // they were never measured for.
+      url: `https://${it.host}/products/${it.id.split('/').slice(1).join('/')}`,
+      host: it.host, title: it.title,
       vendor: it.vendor, price: it.price, currency: it.currency, image: it.image,
     };
     let v;
