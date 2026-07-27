@@ -1,0 +1,101 @@
+[
+  {
+    "id": "www.stanley1913.com/the-flowstate\u2122-duo-lunchbox-8-2-qt-7-76-l",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.stanley1913.com",
+    "title": "The FlowState\u2122 Duo Lunchbox | 8.2 QT",
+    "vendor": "Stanley 1913",
+    "price": 40,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheFlowstateDuoLunchBox8.2QT-BlueDreamStone-Front.png?v=1784908031"
+  },
+  {
+    "id": "www.stanley1913.com/steel-cooler-storage-bins-large",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.stanley1913.com",
+    "title": "Steel Cooler Storage Bins | Large",
+    "vendor": "Stanley 1913",
+    "price": 25,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+  },
+  {
+    "id": "www.stanley1913.com/steel-cooler-storage-bins-medium",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.stanley1913.com",
+    "title": "Steel Cooler Storage Bins | Medium",
+    "vendor": "Stanley 1913",
+    "price": 20,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+  },
+  {
+    "id": "www.stanley1913.com/steel-cooler-storage-bins",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.stanley1913.com",
+    "title": "Steel Cooler Storage Bins | Small",
+    "vendor": "Stanley 1913",
+    "price": 15,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0375/3269/6635/files/Web_PNG_Square-TheSteelCoolerSmallDrop-InBin-Small-Clear-HeroFront.png?v=1784220828"
+  },
+  {
+    "id": "www.otterbox.com/galaxy-z-fold8-defender-series-pro-xt-case",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.otterbox.com",
+    "title": "Galaxy Z Fold8 Defender Series Pro XT Case",
+    "vendor": "OtterBox",
+    "price": 89.99,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-galaxy-z-fold-6-black_89671e28-6be3-4517-aa01-53c4cfac8972.png?v=1784238335"
+  },
+  {
+    "id": "www.otterbox.com/galaxy-z-flip8-thin-flex-series-case",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.otterbox.com",
+    "title": "Galaxy Z Flip8 Thin Flex Series Case",
+    "vendor": "OtterBox",
+    "price": 59.99,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/thin-flex-galaxy-z-flip-6-clear-2_a25b4b27-12a4-4ab5-a74d-3c3597c28584.png?v=1784238332"
+  },
+  {
+    "id": "www.otterbox.com/galaxy-z-fold8-ultra-defender-series-pro-xt-case",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.otterbox.com",
+    "title": "Galaxy Z Fold8 Ultra Defender Series Pro XT Case",
+    "vendor": "OtterBox",
+    "price": 89.99,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-galaxy-z-fold-6-black_b3d20ca3-f0fd-42ab-b75e-5dbe14d2c5c2.png?v=1784238335"
+  },
+  {
+    "id": "www.otterbox.com/galaxy-z-fold8-defender-series-pro-xt-holster",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "www.otterbox.com",
+    "title": "Galaxy Z Fold8 Defender Series Pro XT Holster",
+    "vendor": "OtterBox",
+    "price": 19.99,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0681/4321/8875/files/defender-xt-holster-galaxy-z-fold-5-1_4bc457ce-d2a9-472a-ba3b-935e1c936de2.png?v=1784238332"
+  },
+  {
+    "id": "us.anker.com/a83h1-hdmi-switch",
+    "bucket": "hard_neg",
+    "fp": [],
+    "host": "us.anker.com",
+    "title": "Anker HDMI Switch (2 in 1 Out, 4K HDMI)",
+    "vendor": "Anker",
+    "price": 12.99,
+    "currency": "USD",
+    "image": "https://cdn.shopify.com/s/files/1/0493/9834/9974/files/Group_2147226149.png?v=1762767816"
+  }
+]

@@ -19,7 +19,33 @@ const SHIP_TO = 'US';
 // Measured: at 4.5s bun gets ~4 items before /fn/search-pc/index walls. Slower is the
 // only lever available from a non-browser client.
 const GAP_MS = parseInt(process.env.GAP_MS || '20000', 10);
-const OUT = 'labelset/results.jsonl';
+const OUT = process.env.OUT || 'labelset/results.jsonl';
+// Mirrors encodeForUpload() in the worker. MEASURED: the upload silently returns no
+// fileId on large payloads — Stanley 7.0MB PNG, Otterbox 1.9MB, Anker 870KB all failed
+// while Spigen's 70KB JPEG worked. bun has no OffscreenCanvas, so use macOS sips, which
+// is preinstalled and does exactly this.
+const UPLOAD_MAX_PX = 1200;
+const UPLOAD_MAX_BYTES = 400 * 1024;
+
+async function encodeForUpload(buf, tag) {
+  const b64 = (b) => {
+    const u = new Uint8Array(b);
+    let bin = '';
+    for (let i = 0; i < u.length; i += 0x8000) bin += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+  if (buf.byteLength <= UPLOAD_MAX_BYTES) return b64(buf);
+  const safe = tag.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
+  const src = `/tmp/alibadge-${safe}.bin`;
+  const dst = `/tmp/alibadge-${safe}.jpg`;
+  await Bun.write(src, buf);
+  const p = Bun.spawnSync(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '80',
+    '-Z', String(UPLOAD_MAX_PX), src, '--out', dst]);
+  if (!p.success) { console.log(`    sips failed, using original (${Math.round(buf.byteLength / 1024)}KB)`); return b64(buf); }
+  const out = await Bun.file(dst).arrayBuffer();
+  console.log(`    downscaled ${Math.round(buf.byteLength / 1024)}KB -> ${Math.round(out.byteLength / 1024)}KB`);
+  return b64(out);
+}
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -134,7 +160,8 @@ async function pdpDearest(productId, currency) {
 
 // --- run ---------------------------------------------------------------------
 
-const items = JSON.parse(await Bun.file('labelset/set.json').text());
+const SET = process.env.SET || 'labelset/set.json';
+const items = JSON.parse(await Bun.file(SET).text());
 // Only MEASURED items count as done. A punish or a network failure must be retried,
 // or the final set silently contains rows that never reached a comparison and the
 // scorer's "comparable" rate is computed over work that never happened.
@@ -160,11 +187,7 @@ for (const [n, item] of batch.entries()) {
     title: item.title, vendor: item.vendor, price: item.price, currency: item.currency };
   try {
     const buf = await (await fetch(item.image, { headers: { 'user-agent': UA } })).arrayBuffer();
-    const b = new Uint8Array(buf);
-    let bin = '';
-    for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
-
-    const up = await upload(btoa(bin), item.currency);
+    const up = await upload(await encodeForUpload(buf, item.id), item.currency);
     if (!up.fileId) { rec.render = 'none'; rec.reasons = ['upload_failed']; rec.detail = up.ret; out.push(rec); console.log(`  upload_failed ${item.id} ${up.ret}`); continue; }
 
     const r = await fetchResults(up.fileId, item.currency);
