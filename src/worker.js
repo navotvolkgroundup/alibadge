@@ -425,8 +425,19 @@ async function judge(extraction, found) {
 // Goes through the same enqueue() and the same lookup() a real page does, so the
 // measurement grades shipped behaviour rather than a parallel implementation.
 self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest') => {
-  const items = await (await fetch(itemsUrl)).json();
-  console.log(`[labelset] ${items.length} items loaded, starting`);
+  // Default to the set BUNDLED WITH THE EXTENSION. Two runs produced nothing because
+  // the very first line fetched http://127.0.0.1 — unguarded, so it threw before
+  // logging anything, and a blocked private-network request looked exactly like
+  // pasting into the wrong console. An extension URL cannot fail that way.
+  const url = itemsUrl || chrome.runtime.getURL('labelset/set.json');
+  let items;
+  try {
+    items = await (await fetch(url)).json();
+  } catch (e) {
+    console.error(`[labelset] could not load the set from ${url}: ${e}`);
+    return null;
+  }
+  console.log(`[labelset] ${items.length} items loaded from ${url}, starting`);
   const out = [];
   let postOk = true;
   for (const [n, it] of items.entries()) {
@@ -449,9 +460,7 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
     });
     console.log(`[labelset] ${n + 1}/${items.length} ${it.bucket} ${v.render} ` +
       `${(v.reasons || []).join(',')} ${it.id}`);
-    // Post incrementally: a punish partway through must not cost the earlier items.
-    // NOT swallowed — a silently failing POST is indistinguishable from a run that
-    // never started, which is exactly the confusion it caused the first time.
+    // Opportunistic: nice when it works, never load-bearing.
     if (postOk) {
       try {
         const r = await fetch(postTo, { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -459,14 +468,12 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
         if (!r.ok) throw new Error('HTTP ' + r.status);
       } catch (e) {
         postOk = false;
-        console.warn(`[labelset] POST to ${postTo} failed (${String(e).slice(0, 80)}) — ` +
-          'continuing, and the full JSON is logged at the end. Copy it from there.');
+        console.warn(`[labelset] POST to ${postTo} failed (${String(e).slice(0, 60)}) — ` +
+          'continuing; copy the JSON logged at the end instead.');
       }
     }
   }
   console.log('[labelset] done,', out.length, 'items');
-  // Always logged, so the measurement survives a dead server or a blocked
-  // private-network request. Right-click → Copy string contents.
   console.log('[labelset] JSON:\n' + JSON.stringify(out));
   return out;
 };

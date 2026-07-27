@@ -134,14 +134,22 @@ bun labelset/probe.js          # candidates -> probed.json (free, no AliExpress 
 python3 labelset/serve.py      # serves the set, receives harvested verdicts
 ```
 
-Then **from the extension's service-worker console** (not bun — see below):
+Then, from **the extension's service-worker console** — the "service worker" link on
+`chrome://extensions`, NOT the page console; `self.__alibadgeLabelset` does not exist
+in a page:
 
 ```
-await self.__alibadgeLabelset('http://127.0.0.1:8899/_items.json')
+await self.__alibadgeLabelset()
 ```
 
+The set is bundled at `labelset/set.json` and loaded via `chrome.runtime.getURL`, so
+this needs no server. It logs `[labelset] 44 items loaded` immediately, a line per
+item, and the full JSON at the end. If `serve.py` is running it also POSTs progress
+after every item, which is convenient but never load-bearing.
+
 ```
-bun labelset/score.js labelset/harvest.json
+bun labelset/score.js labelset/harvest.json   # if the POST worked
+pbpaste | bun labelset/score.js -             # otherwise, from the logged JSON
 ```
 
 **Why it cannot run from bun.** `labelset/run.js` is the bun version and it does work —
