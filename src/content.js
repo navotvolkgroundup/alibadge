@@ -270,12 +270,7 @@
 
   async function render(gen, extraction, verdict) {
     if (gen !== generation) return log('stale verdict discarded');
-    const upd = await chrome.storage.local.get('updatedAt').catch(() => ({}));
-    if (upd && upd.updatedAt && upd.updatedAt > INJECTED_AT) {
-      stale = true;
-      console.warn('[alibadge] STALE: the extension was reloaded after this page ' +
-        'loaded, so this script is old code. Reload the PAGE. Receipt disabled.');
-    }
+
     if (!verdict || verdict.render === 'none') {
       console.log('[alibadge] SILENT —', ((verdict && verdict.reasons) || ['no response']).join(', '));
       return;
@@ -307,8 +302,25 @@
       $('[data-sub]').textContent = verdict.note
         ? `${verdict.note} · excludes shipping · ${verdict.capturedAt}`
         : `excludes shipping · ${verdict.shipTo}/${verdict.aliCurrency} · ${verdict.capturedAt}`;
-      // A receipt from stale code is a wrong artifact, and this one is meant to be
-      // posted publicly — so refuse rather than render something unreproducible.
+      // Staleness matters for ONE thing: a receipt built by orphaned code is a wrong
+      // artifact meant for public posting. So the check lives here, not at the top of
+      // render() — there it ran on every silent page too, and when it threw it aborted
+      // the render entirely, suppressing badges instead of protecting receipts.
+      //
+      // try/catch, NOT .catch(): in an invalidated context chrome.storage.local.get
+      // throws SYNCHRONOUSLY, so no promise exists to attach a handler to. That is
+      // what produced "Uncaught (in promise) Extension context invalidated".
+      try {
+        const upd = await chrome.storage.local.get('updatedAt');
+        if (upd && upd.updatedAt && upd.updatedAt > INJECTED_AT) stale = true;
+      } catch {
+        // The only way this throws is an invalidated context, which IS staleness.
+        stale = true;
+      }
+      if (stale) {
+        console.warn('[alibadge] STALE: the extension was reloaded after this page ' +
+          'loaded, so this is old code. Reload the PAGE — receipt disabled.');
+      }
       $('[data-copy]').hidden = false;
       $('[data-copy]').textContent = stale ? 'reload page first' : 'copy receipt';
       $('[data-copy]').onclick = () => (stale
