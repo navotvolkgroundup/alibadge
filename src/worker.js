@@ -155,63 +155,55 @@ async function uploadImage(b64, currency) {
   return fileId || null;
 }
 
-// --- AliExpress: authoritative price in a chosen currency --------------------
-// The results endpoint returns whatever currency the caller's geo implies (ILS
-// here), which decide() rightly refuses to compare against a USD store price.
-// pdp.pc.query DOES honour _currency per call, so it is the price source.
-// Different appKey and its own handshake.
-const PDP_API = 'mtop.aliexpress.pdp.pc.query';
-const PDP_APPKEY = '12574478';
-const PDP_HOST = 'https://acs.aliexpress.com';
+// --- AliExpress: results in the STORE's currency ------------------------------
+// The results endpoint returns whatever currency the caller's geo implies (ILS from
+// Israel), and decide() rightly refuses to compare that against a USD store price.
+//
+// MEASURED 2026-07-27, same fileId, back to back:
+//   with aep_usuc_f c_tp=USD  -> 60 items, currencies [USD], first "US $94.73"
+//   no cookie (control)       -> 60 items, currencies [ILS], first "\u20aa 21.25"
+//
+// So one cookie does the whole job. This replaces mtop.aliexpress.pdp.pc.query,
+// which was the previous plan and is a dead end twice over: it is punished on the
+// FIRST call from outside a browser (FAIL_SYS_USER_VALIDATE), and it needed its own
+// appKey and handshake to re-price candidates one at a time. A cookie costs nothing
+// and fixes every candidate at once.
+//
+// region stays US to match the pinned shpt_co, which the receipt discloses.
+const AEP_COOKIE = 'aep_usuc_f';
 
-async function pdpCall(data, token) {
-  const t = Date.now();
-  const sign = md5([token || '', t, PDP_APPKEY, data].join('&'));
-  const qs = new URLSearchParams({
-    jsv: '2.5.1', appKey: PDP_APPKEY, t: String(t), sign,
-    api: PDP_API, v: '1.0', type: 'originaljson', dataType: 'json', timeout: '15000',
-  });
-  const res = await fetch(`${PDP_HOST}/h5/${PDP_API}/1.0/?${qs}`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(data),
-  });
-  return res.json().catch(() => null);
-}
-
-async function pdpPrice(productId, currency) {
-  const data = JSON.stringify({
-    productId: String(productId), _lang: 'en_US', _currency: currency, country: SHIP_TO,
-    province: '', city: '', channel: '', pdp_ext_f: '', pdpNPI: '', sourceType: '',
-    clientType: 'pc',
-    ext: JSON.stringify({ site: 'glo', crawler: false, signedIn: false, host: 'www.aliexpress.com' }),
-  });
+// The cookie is the USER's — it drives the currency they see on aliexpress.com. Set
+// it for the search, then put back exactly what was there, including absent.
+async function withStoreCurrency(currency, fn) {
+  const url = RESULTS_LOCALE + '/';
+  let prior = null;
   try {
-    let j = await pdpCall(data, await tokenFor(PDP_HOST));
-    if (j && String(j.ret).includes('TOKEN_EMPTY')) j = await pdpCall(data, await tokenFor(PDP_HOST));
-    const s = JSON.stringify(j || {});
-    const nums = [...s.matchAll(/"formatedAmount"\s*:\s*"[^\d"]*([\d.,]+)"/g)]
-      .map((m) => parseFloat(m[1].replace(/,/g, '')))
-      .filter((n) => Number.isFinite(n) && n > 0);
-    if (!nums.length) return null;
-    // DEAREST variant, deliberately. A listing spans 1pc to 24pc, and the cheapest
-    // end inflates the ratio — measured, that choice flipped the badge verdict on
-    // 3 of 10 products. Conservative is the only defensible direction on an
-    // artifact that names a merchant.
-    return Math.max(...nums);
-  } catch {
-    return null;
+    prior = await chrome.cookies.get({ url, name: AEP_COOKIE });
+  } catch {}
+  const want = `site=glo&c_tp=${currency || CURRENCY}&region=${SHIP_TO}&b_locale=en_US`;
+  const domain = '.aliexpress.com';
+  try {
+    await chrome.cookies.set({ url, name: AEP_COOKIE, value: want, domain, path: '/' });
+    return await fn();
+  } finally {
+    try {
+      if (prior && prior.value) {
+        await chrome.cookies.set({ url, name: AEP_COOKIE, value: prior.value, domain, path: '/' });
+      } else {
+        await chrome.cookies.remove({ url, name: AEP_COOKIE });
+      }
+    } catch (e) {
+      log('could not restore', AEP_COOKIE, String(e).slice(0, 60));
+    }
   }
 }
 
-// --- AliExpress: results -----------------------------------------------------
-// Needs no cookies and no content-type. Returns 60 items; the rendered page only
-// shows 12, so never scrape the DOM for this.
 async function fetchResults(fileId, attempt = 1) {
   const res = await fetch(`${RESULTS_LOCALE}/fn/search-pc/index`, {
     method: 'POST',
-    credentials: 'omit',
+    // include, NOT omit: the currency comes from the aep_usuc_f cookie set by
+    // withStoreCurrency(), and omitting credentials silently reverts to geo currency.
+    credentials: 'include',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ isNewImageSearch: 'y', filename: fileId, pageVersion: '', page: 1 }),
   });
@@ -326,7 +318,10 @@ async function lookup(extraction, pageOrigin) {
 
   let results;
   try {
-    results = await fetchResults(fileId);
+    // Wrapped so every candidate comes back already priced in the store's currency.
+    // Nothing downstream converts anything: decide() compares like with like or
+    // refuses, and there is no FX rate anywhere in this extension.
+    results = await withStoreCurrency(extraction.currency, () => fetchResults(fileId));
   } catch (e) {
     if (e && (e.punished || e.httpStatus)) {
       // A fileId exists, so the search DID run — degrade to the link rather than
@@ -339,32 +334,15 @@ async function lookup(extraction, pageOrigin) {
     }
     throw e;
   }
-  // Re-price the top candidates in the STORE's currency. Without this the results
-  // arrive in the caller's geo currency and decide() correctly refuses to compare
-  // across currencies — which is exactly the currency_mismatch that blocked every
-  // badge from showing a number.
-  let priced = results;
-  if (results.length && extraction.currency) {
-    const head = results.slice(0, 3);
-    const fixed = await Promise.all(head.map(async (r) => {
-      if (r.currency === extraction.currency) return r;
-      const p = await pdpPrice(r.productId, extraction.currency);
-      return p == null ? null : { ...r, price: p, currency: extraction.currency };
-    }));
-    const ok = fixed.filter(Boolean);
-    if (ok.length) priced = ok.concat(results.slice(3));
-    log(`repriced ${ok.length}/${head.length} into ${extraction.currency}`);
-  }
-
   // Cache the SEARCH, not the verdict — see judge(). Empty results are the one
   // transient case that reaches here (every other failure returned early), and
   // caching those turned one bad minute into a week of silence.
-  if (priced.length) {
-    await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], { fileId, results: priced });
+  if (results.length) {
+    await cachePut(urlKey ? [byteKey, urlKey] : [byteKey], { fileId, results });
   } else {
     log('not caching: no results');
   }
-  return judge(extraction, { fileId, results: priced });
+  return judge(extraction, { fileId, results });
 }
 
 // Everything downstream of the network. Deliberately OUTSIDE the cache: twice now

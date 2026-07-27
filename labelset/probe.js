@@ -66,6 +66,21 @@ function fingerprint(products) {
   return [...new Set(hits)];
 }
 
+// /products.json carries NO currency field. Hardcoding USD was wrong: the set had a
+// .co.uk store in it, and a mislabelled currency makes every comparison for that
+// store either a false currency_mismatch or, worse, a ratio across two currencies.
+// /cart.js is same-origin, tiny, and always reports the shop's active currency.
+async function storeCurrency(host) {
+  try {
+    const r = await fetch(`https://${host}/cart.js`, { headers: { 'user-agent': UA } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j && j.currency ? j.currency : null;
+  } catch {
+    return null;
+  }
+}
+
 async function probe(host) {
   const url = `https://${host}/products.json?limit=40`;
   try {
@@ -76,7 +91,8 @@ async function probe(host) {
     const j = await res.json();
     const products = j.products || [];
     if (!products.length) return { ok: false, why: 'no_products' };
-    return { ok: true, n: products.length, fp: fingerprint(products), products };
+    const currency = await storeCurrency(host);
+    return { ok: true, n: products.length, fp: fingerprint(products), currency, products };
   } catch (e) {
     return { ok: false, why: String(e.message || e).slice(0, 40) };
   }
@@ -86,7 +102,9 @@ const rows = [];
 for (const [bucket, host] of CANDIDATES) {
   const r = await probe(host);
   rows.push({ bucket, host, ...r });
-  const tag = r.ok ? `${r.n} products  fp=[${r.fp.join(',') || '-'}]` : `SKIP ${r.why}`;
+  const tag = r.ok
+    ? `${r.n} products  ${r.currency || 'CURRENCY?'}  fp=[${r.fp.join(',') || '-'}]`
+    : `SKIP ${r.why}`;
   console.log(`${bucket.padEnd(9)} ${host.padEnd(26)} ${tag}`);
   await new Promise((r2) => setTimeout(r2, 300));
 }
@@ -100,8 +118,8 @@ for (const b of ['dropship', 'easy_neg', 'hard_neg']) {
 }
 
 await Bun.write('labelset/probed.json', JSON.stringify(
-  usable.map(({ bucket, host, fp, products }) => ({
-    bucket, host, fp,
+  usable.map(({ bucket, host, fp, currency, products }) => ({
+    bucket, host, fp, currency,
     // Keep only what the runner needs, and only products with an image and a price.
     products: products
       .filter((p) => (p.images || []).length && (p.variants || []).length)

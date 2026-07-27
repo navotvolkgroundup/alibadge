@@ -56,10 +56,9 @@ dark timeline, so the composition can be iterated without reloading the extensio
    appKey 24815441, on `recom-acs.aliexpress.com`. Returns a `fileId`.
 3. **Results** — `POST /fn/search-pc/index` with `{isNewImageSearch:"y", filename:<fileId>}`.
    Returns **60** items at `data.data.root.fields.mods.itemList.content`. Needs no cookies.
-4. **Re-price** — the results endpoint returns whatever currency the caller's geo implies,
-   so the top 3 candidates go through `mtop.aliexpress.pdp.pc.query` (appKey 12574478, on
-   `acs.aliexpress.com`, its own handshake), which honours `_currency` per call. Takes the
-   DEAREST variant: the cheapest inflates the ratio, and measured it flipped 3 of 10 verdicts.
+4. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
+   currency around the results call, so all 60 candidates arrive already comparable, then
+   restores whatever the user had. No FX rate exists anywhere in this extension.
 5. **Decide** — `decide()` owns the render policy and returns all failing reasons.
 
 Verified live end-to-end on 2026-07-26: handshake → 180,488-char base64 upload → 60 items
@@ -80,6 +79,15 @@ with prices and sold counts.
   context it has been reliable. Whether Chrome's own network stack in the worker behaves
   like the browser or like the script is **the open question** — `reasons: ['punished']`
   exists to tell you.
+- **The results currency is a COOKIE, not a parameter.** `aep_usuc_f` with `c_tp=USD`
+  makes `/fn/search-pc/index` return USD; without it, geo currency (ILS from Israel).
+  Measured on one `fileId` back to back, 60 items each way. The request therefore uses
+  `credentials: 'include'` — switching it to `omit` silently reverts to geo currency
+  and every USD store degrades to `currency_mismatch`. `withStoreCurrency()` restores
+  the user's own cookie afterwards, since it drives the currency they see on the site.
+- **`mtop.aliexpress.pdp.pc.query` is a dead end.** It was the planned fix for the
+  currency problem. It is punished on the FIRST call from outside a browser
+  (`FAIL_SYS_USER_VALIDATE`), and it re-priced one candidate per call. Deleted.
 - **`fileId`s expire quickly.** Minutes. Don't cache one and reuse it later.
 - **Never scrape the results DOM** — it renders 12 of the 60 items the API returns.
 - **`salePrice`, never `originalPrice`** — originalPrice is the struck-through figure and
@@ -131,6 +139,7 @@ number only measures the easy case.
 
 ```
 bun labelset/probe.js          # candidates -> probed.json (free, no AliExpress calls)
+bun labelset/build.js          # probed.json -> set.json, the file the extension loads
 python3 labelset/serve.py      # serves the set, receives harvested verdicts
 ```
 
@@ -159,10 +168,11 @@ for about three items. Then `/fn/search-pc/index` rate-punishes every retry, and
 calls work. `run.js` is kept because it is the fastest way to check the plumbing, not
 because it can produce the number.
 
-**A consequence worth knowing:** because pdp.pc.query never answered outside the
-extension, the dearest-variant re-price in `worker.js` is **unverified**. The live
-badge that appeared to prove it was a case where store and results were both ILS, so
-no conversion happened. `repriced 0/3` in the worker console means it is still failing.
+**The scorer refuses to grade an unusable run.** A bucket that never reached a
+price-vs-price comparison cannot produce a false positive, so "0 false positives"
+there is an absence of evidence that reads like a pass. `currency_mismatch` counts as
+not-comparable for exactly this reason — `decide()` refuses before any guard runs.
+Below 70% comparable, the number is replaced by `INVALID`.
 
 `probe.js` also fingerprints each store for importer signatures (DSers SKU shapes,
 `product-image-<digits>` filenames, `My Store` vendor). That is the unbiased labeller
