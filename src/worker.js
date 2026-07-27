@@ -654,11 +654,13 @@ self.__alibadgeProbeUrl = async (url, force = false) => {
   // hold ILS-priced candidates, and before the pdp lookup hold no dearest flag — so a
   // cache hit can answer with numbers the current code would never produce.
   if (force) {
-    const k = urlCacheKey(url);
-    const keys = Object.keys(await chrome.storage.local.get(null))
-      .filter((x) => x.startsWith('c:') && (!k || x.includes(k)));
+    // ALL of them, not just the url-keyed ones. Filtering by url key left the
+    // sha256-of-image-bytes entry in place, so the "fresh" run logged
+    // `cache hit (bytes)` and answered from the same stale results — including a
+    // priceBasis of 'cheapest variant', which only happens when pdp never ran.
+    const keys = Object.keys(await chrome.storage.local.get(null)).filter((x) => x.startsWith('c:'));
     await chrome.storage.local.remove(keys);
-    log(`probe: cleared ${keys.length} cache entries`);
+    log(`probe: cleared ${keys.length} cache entries (all)`);
   }
   const verdict = await enqueue(() => lookup(extraction, u.origin));
   return {
