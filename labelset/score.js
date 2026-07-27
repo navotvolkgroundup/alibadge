@@ -100,14 +100,21 @@ function report(rowsIn, label) {
 
   console.log(`\n  FALSE POSITIVES (a full badge on a negative):`);
   for (const [name, g] of [['hard negatives', hn], ['easy negatives', en]]) {
-    const p = rate(g);
-    const primary = name.startsWith('hard') ? '  <- primary criterion, must be 0' : '';
     if (!g.length) { console.log(`    ${name}: (none in this slice)`); continue; }
-    if (p < MIN_PLUMB) {
-      console.log(`    ${name}: INVALID — only ${Math.round(p * 100)}% of this bucket got ` +
-        `results (need ${MIN_PLUMB * 100}%). Quiet for lack of data, not because a guard fired.`);
+    const p = rate(g);
+    const bad = g.filter((r) => r.render === 'full').length;
+    const primary = name.startsWith('hard') ? '  <- primary criterion, must be 0' : '';
+    // ASYMMETRY: low coverage can only invalidate a claim of ZERO. An OBSERVED false
+    // positive is a fact whatever the coverage — refusing to print it because the
+    // bucket was thin would suppress the finding the whole exercise exists to surface.
+    if (bad > 0) {
+      console.log(`    ${name}: ${bad}/${g.length} OBSERVED${primary}` +
+        (p < MIN_PLUMB ? `  (only ${Math.round(p * 100)}% comparable, so the TRUE rate is likely higher)` : ''));
+    } else if (p < MIN_PLUMB) {
+      console.log(`    ${name}: cannot claim zero — only ${Math.round(p * 100)}% of this bucket ` +
+        `got results (need ${MIN_PLUMB * 100}%). Quiet for lack of data, not because a guard fired.`);
     } else {
-      console.log(`    ${name}: ${g.filter((r) => r.render === 'full').length}/${g.length}${primary}`);
+      console.log(`    ${name}: 0/${g.length}${primary}`);
     }
   }
   const dpRate = rate(dp);
@@ -119,8 +126,9 @@ function report(rowsIn, label) {
   }
 
   const overall = rate(rowsIn);
-  if (overall < MIN_PLUMB) {
-    console.log(`\n  *** RUN NOT USABLE: ${Math.round(overall * 100)}% plumbing overall. ***`);
+  const anyBad = [...hn, ...en].some((r) => r.render === 'full');
+  if (overall < MIN_PLUMB && !anyBad) {
+    console.log(`\n  *** CANNOT CERTIFY: ${Math.round(overall * 100)}% comparable overall. ***`);
     console.log('  Re-run when the endpoint is not punishing. Do not tune against this.');
   }
 }
@@ -173,9 +181,9 @@ const notes = scored.filter((r) => r.note);
 console.log(`\ncaveats printed: ${notes.length}`);
 for (const r of notes.slice(0, 12)) console.log(`  [${r.bucket}] ${r.note}  — ${r.id}`);
 
-const fp = scored.filter((r) => r.bucket === 'hard_neg' && r.render === 'full');
+const fp = scored.filter((r) => r.bucket !== 'dropship' && r.render === 'full');
 if (fp.length) {
-  console.log('\nFALSE POSITIVES IN DETAIL:');
+  console.log('\nFALSE POSITIVES IN DETAIL — a full badge on a store that is not a dropshipper:');
   for (const r of fp) {
     console.log(`  ${r.id}\n    store ${r.storePrice} ${r.storeCur} vs ali ${r.aliPrice} ${r.aliCur} = ${r.ratio}x`);
     console.log(`    matched: ${r.aliTitle}`);

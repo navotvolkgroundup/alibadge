@@ -397,6 +397,47 @@ async function fetchResults(fileId, attempt = 1) {
 // access-control-allow-origin in a browser context, and aliexpress-media.com is
 // blocked outright by common ad blockers. So the worker fetches them (no CORS
 // applies to host_permissions) and hands back data URLs, which never taint.
+function toBase64(buf) {
+  const b = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// MEASURED: the upload silently returns no fileId on large payloads. Store hero images
+// are routinely PNGs of 1-7MB — Stanley 7.0MB, Otterbox 1.9MB, Anker 870KB all failed;
+// Spigen's 70KB JPEG succeeded. That cost 9 of 16 hard negatives in the labelled run,
+// i.e. most of the bucket the primary success criterion depends on, and it looked like
+// a property of those stores rather than a payload limit.
+//
+// So downscale to a bounded JPEG before uploading. Full resolution is only worth
+// keeping while it fits: the design doc's warning was about the 8KB jsonp cap wrecking
+// match quality, and 1200px is nowhere near that.
+const UPLOAD_MAX_PX = 1200;
+const UPLOAD_MAX_BYTES = 400 * 1024;
+
+async function encodeForUpload(buf) {
+  if (buf.byteLength <= UPLOAD_MAX_BYTES) return { b64: toBase64(buf), resized: false };
+  try {
+    const bmp = await createImageBitmap(new Blob([buf]));
+    const scale = Math.min(1, UPLOAD_MAX_PX / Math.max(bmp.width, bmp.height));
+    const c = new OffscreenCanvas(Math.round(bmp.width * scale), Math.round(bmp.height * scale));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const dims = `${bmp.width}x${bmp.height} -> ${c.width}x${c.height}`;
+    bmp.close();
+    let blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
+    // One retry at lower quality; a 7MB PNG of a flat product shot can still exceed
+    // the cap after a size-only downscale.
+    if (blob.size > UPLOAD_MAX_BYTES) blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+    log(`upload image ${Math.round(buf.byteLength / 1024)}KB -> ${Math.round(blob.size / 1024)}KB (${dims})`);
+    return { b64: toBase64(await blob.arrayBuffer()), resized: true };
+  } catch (e) {
+    // Better to try the original than to give up: it may still be under the real cap.
+    log('downscale failed, uploading original:', String(e).slice(0, 60));
+    return { b64: toBase64(buf), resized: false };
+  }
+}
+
 async function thumb(url, px = 260) {
   if (!url) return null;
   try {
@@ -408,11 +449,7 @@ async function thumb(url, px = 260) {
     c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
     bmp.close();
     const blob = await c.convertToBlob({ type: 'image/jpeg', quality: 0.82 });
-    const buf = await blob.arrayBuffer();
-    const b = new Uint8Array(buf);
-    let bin = '';
-    for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
-    return 'data:image/jpeg;base64,' + btoa(bin);
+    return 'data:image/jpeg;base64,' + toBase64(await blob.arrayBuffer());
   } catch (e) {
     log('thumb failed', String(e).slice(0, 80));
     return null;
@@ -438,12 +475,7 @@ async function lookup(extraction, pageOrigin) {
   const hit = await cacheGet([byteKey]);
   if (hit) { log('cache hit (bytes)'); return judge(extraction, hit); }
 
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  }
-  const b64 = btoa(bin);
+  const { b64 } = await encodeForUpload(buf);
 
   const fileId = await uploadImage(b64, extraction.currency);
   // Nothing renders before a fileId exists: it is both the evidence that the
@@ -626,6 +658,10 @@ self.__alibadgeLabelset = async (itemsUrl, fresh = false) => {
       render: v.render, reasons: v.reasons || [], note: v.note || null,
       aliPrice: v.aliPrice ?? null, aliCurrency: v.aliCurrency ?? null,
       aliTitle: v.aliTitle ?? null, aliUrl: v.aliUrl ?? null, markup: v.markup ?? null,
+      // Both image URLs, so a perceptual-hash experiment can run offline with no
+      // further AliExpress calls — the next question is whether hash distance
+      // separates reused supplier photos from a brand's own photography.
+      storeImage: it.image, aliImage: v.aliImage ?? null,
       // Whether the number is a measurement or an upper bound.
       priceBasis: v.priceBasis ?? null,
     });

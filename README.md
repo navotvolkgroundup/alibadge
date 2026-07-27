@@ -98,6 +98,11 @@ with prices and sold counts.
   to `parsePrice` returns **80**, a 10x overstatement in the accusing direction. And
   `originalPrice` is the struck-through figure. Only `salePriceString` is safe, and
   `dearestFromSkuMap()` in lib.js is tested against a verbatim live entry for both.
+- **Large images silently fail the upload.** No `fileId`, no error. Measured: Stanley
+  7.0MB PNG, Otterbox 1.9MB, Anker 870KB all failed; Spigen's 70KB JPEG worked. That
+  cost 9 of 16 hard negatives in the labelled run — most of the bucket the primary
+  success criterion depends on — and it read as a property of those stores rather than
+  a payload limit. `encodeForUpload()` downscales to 1200px / 400KB JPEG first.
 - **`fileId`s expire quickly.** Minutes. Don't cache one and reuse it later.
 - **Never scrape the results DOM** — it renders 12 of the 60 items the API returns.
 - **`salePrice`, never `originalPrice`** — originalPrice is the struck-through figure and
