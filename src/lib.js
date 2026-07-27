@@ -115,11 +115,9 @@ export const MAX_RATIO = 15;
 // is a counterfeit victim. An unconditioned ceiling suppresses genuine dropshippers.
 export const MAX_RATIO_APPLIES_ABOVE = 15;
 
-// ponytail: brand list is a stub. Real coverage needs a shipped token list;
-// upgrade path is a bundled JSON of registered marks. It is deliberately NOT
-// load-bearing any more — see knownBrandIn().
-// Now that a hit only prints a caveat, an incomplete list costs a missing caveat
-// rather than a suppressed true find — so erring long is the cheap direction.
+// ponytail: a stub list, and deliberately NOT load-bearing — knownBrandIn() only
+// produces a printed caveat, so a missing token costs a missing caveat rather than a
+// suppressed true find. Erring long is the cheap direction.
 const KNOWN_BRAND_TOKENS = [
   'stanley', 'owala', 'dyson', 'nike', 'adidas', 'ray-ban', 'rayban', 'apple',
   'samsung', 'sony', 'bose', 'lego', 'yeti', 'hydroflask', 'lululemon',
@@ -162,19 +160,24 @@ export function knownBrandIn(title, storeHost) {
   return KNOWN_BRAND_TOKENS.find((b) => hay.includes(b)) || null;
 }
 
-export function brandGuard({ storePrice, aliPrice, title = '', storeHost = '', resultPrices = [] }) {
+// The ONLY remaining hard suppressor. `price_dispersion` used to live here — "many
+// wildly different prices for one photograph is the counterfeit signature" — and it was
+// deleted after measurement: across 5 of 5 dropship items it fired on spreads of ~124x
+// and suppressed genuine 18.2x, 11.6x and 3.9x markups. The spread measures how loosely
+// AliExpress image search recalls, not counterfeiting, and there is no rank window that
+// fixes it — junk appeared as high as rank 5. Zero measured true positives, five
+// measured false suppressions.
+//
+// It can come back when a perceptual-hash gate exists to define "the same photograph",
+// which is the premise the check needed and never had.
+export function brandGuard({ storePrice, aliPrice }) {
   const reasons = [];
-  const ratio = storePrice / aliPrice;
-
-  // Implausible gap on a non-trivial marketplace price suggests a counterfeit of a
-  // real brand, not a dropshipper's markup.
-  if (aliPrice > MAX_RATIO_APPLIES_ABOVE && ratio > MAX_RATIO) reasons.push('ratio_implausible');
-
-
-  // Many wildly different prices for one photograph is the counterfeit signature.
-  const p = resultPrices.filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
-  if (p.length >= 4 && p[p.length - 1] / p[0] > 20) reasons.push('price_dispersion');
-
+  // Implausible gap on a non-trivial marketplace price suggests a counterfeit of a real
+  // brand rather than a dropshipper's markup. Conditional on absolute price: cheap goods
+  // produce huge ratios legitimately because the base is $2-6.
+  if (aliPrice > MAX_RATIO_APPLIES_ABOVE && storePrice / aliPrice > MAX_RATIO) {
+    reasons.push('ratio_implausible');
+  }
   return reasons;
 }
 
@@ -217,7 +220,6 @@ export function decide(extraction, results, gate) {
     aliPrice,
     title: extraction.title,
     storeHost: extraction.host,
-    resultPrices: results.map((r) => parsePrice(r.price)).filter(Boolean),
   });
 
   // What survives as a hard guard: a gap so implausible on a non-trivial price, or a

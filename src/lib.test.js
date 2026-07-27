@@ -109,18 +109,13 @@ test('brand guard vetoes a huge ratio on an EXPENSIVE marketplace item', () => {
   expect(r).toContain('ratio_implausible');
 });
 
-test('brand guard vetoes known brand tokens in title or host', () => {
+test('knownBrandIn finds the mark the store itself names', () => {
   expect(knownBrandIn('Stanley Quencher 40oz', '')).toBe('stanley');
   expect(knownBrandIn('Tumbler', 'shop.yeti.com')).toBe('yeti');
   expect(knownBrandIn('Vintage Cutlery Set', 'warmlydecor.com')).toBe(null);
   // The token that started this: absent from the list, it produced no caveat at all
   // on a page whose only brand signal is the title.
   expect(knownBrandIn('כיסוי Otterbox ל iPad Air 11', 'i-cell.co.il')).toBe('otterbox');
-});
-
-test('brand guard vetoes extreme price dispersion', () => {
-  const r = brandGuard({ storePrice: 90, aliPrice: 5, title: 'x', resultPrices: [2, 4, 9, 60, 120] });
-  expect(r).toContain('price_dispersion');
 });
 
 // --- decide() ----------------------------------------------------------------
@@ -330,4 +325,17 @@ test('dearestFromSkuMap returns null on junk rather than a wrong number', () => 
   expect(dearestFromSkuMap(null, 'USD')).toBe(null);
   expect(dearestFromSkuMap({}, 'USD')).toBe(null);
   expect(dearestFromSkuMap({ a: { salePriceString: 'Free' } }, 'USD')).toBe(null);
+});
+
+test('a real markup is no longer suppressed by junk in the result tail', () => {
+  // The measured failure that deleted price_dispersion: image search returns unrelated
+  // cheap items among the candidates, and judging price SPREAD on them suppressed 5 of
+  // 5 genuine dropship markups. The junk must not affect the verdict at all.
+  const top = { productId: '1', price: '$7.00', currency: 'USD', title: 'Cutlery Set 24pc' };
+  const near = [2, 3, 4].map((i) => ({ ...top, productId: String(i), price: '$8.00' }));
+  const junk = [5, 6].map((i) => ({ ...top, productId: String(i), price: '$0.06' }));
+  const d = decide({ price: 84.95, currency: 'USD', host: 'warmlydecor.com', vendor: 'Warmly', title: 'Cutlery' },
+    [top, ...near, ...junk], null);
+  expect(d.reasons).toEqual([]);
+  expect(d.render).toBe('full');
 });
