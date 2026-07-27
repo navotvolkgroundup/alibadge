@@ -57,9 +57,9 @@ dark timeline, so the composition can be iterated without reloading the extensio
 3. **Results** — `POST /fn/search-pc/index` with `{isNewImageSearch:"y", filename:<fileId>}`.
    Returns **60** items at `data.data.root.fields.mods.itemList.content`. Needs no cookies.
 4. **Dearest variant** — ONE `pdp.pc.query` for the winner only, before the cache write,
-   so a cache hit never re-issues it. Returns null on a punish and the badge degrades to
-   the bound rather than disappearing. Whether it works inside the extension is the
-   open question — `self.__alibadgePdp('<productId>')` answers it in one line.
+   so a cache hit never re-issues it. Verified working inside the extension; returns null
+   on a punish and the badge degrades to the bound rather than disappearing.
+   `self.__alibadgePdp('<productId>')` dumps the payload shape if it ever moves.
 5. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
    currency around the results call, so all 60 candidates arrive already comparable, then
    restores whatever the user had. No FX rate exists anywhere in this extension.
@@ -89,9 +89,15 @@ with prices and sold counts.
   `credentials: 'include'` — switching it to `omit` silently reverts to geo currency
   and every USD store degrades to `currency_mismatch`. `withStoreCurrency()` restores
   the user's own cookie afterwards, since it drives the currency they see on the site.
-- **`mtop.aliexpress.pdp.pc.query` is a dead end.** It was the planned fix for the
-  currency problem. It is punished on the FIRST call from outside a browser
-  (`FAIL_SYS_USER_VALIDATE`), and it re-priced one candidate per call. Deleted.
+- **`pdp.pc.query` works from the extension, and only from there.** Measured: `SUCCESS`,
+  ~74KB, and no MTOP handshake needed because the cookie is already present. From bun the
+  same request is punished on the FIRST call (`FAIL_SYS_USER_VALIDATE`), so that punish
+  was about the client, not the endpoint. It is not a currency fix — the cookie is — it
+  is the only source of the DEAREST variant.
+- **Two traps inside `skuPriceInfoMap`.** `salePriceLocal` is `"$9.80|9|80"`; feeding it
+  to `parsePrice` returns **80**, a 10x overstatement in the accusing direction. And
+  `originalPrice` is the struck-through figure. Only `salePriceString` is safe, and
+  `dearestFromSkuMap()` in lib.js is tested against a verbatim live entry for both.
 - **`fileId`s expire quickly.** Minutes. Don't cache one and reuse it later.
 - **Never scrape the results DOM** — it renders 12 of the 60 items the API returns.
 - **`salePrice`, never `originalPrice`** — originalPrice is the struck-through figure and
@@ -99,8 +105,9 @@ with prices and sold counts.
 - **The results payload has no dearest-variant price.** Dumped 2026-07-27 across 60
   items: `salePrice.minPrice` and nothing else — no max, no `skuPriceInfoMap`, and
   `formattedPrice` is never a range, so `parsePrice`'s range-max path never fires here.
-  Without the `pdp.pc.query` upgrade the markup is an **upper bound**, and the receipt
-  says so. **The basis string is DERIVED from the winner, never hardcoded** — a constant
+  The dearest variant comes from `pdp.pc.query` instead — measured on 32930388619: 24
+  skus spanning \$6.28 to \$9.80. When that call fails the markup is an **upper bound**
+  and the receipt says so. **The basis string is DERIVED from the winner, never hardcoded** — a constant
   is exactly what let the receipt print "dearest variant" for a whole period after the
   code producing dearest prices was deleted. There is a Playwright test on this.
 - **Don't add the `tabs` permission.** `changeInfo.url` is populated already because

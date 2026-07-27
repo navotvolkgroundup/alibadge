@@ -6,7 +6,7 @@ import {
   parsePrice, parseShopifyCents, isAllowedImageUrl, absoluteFloor, brandGuard,
   decide, pickWinner, urlCacheKey, markupPercent, md5,
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
-  vendorMismatch, knownBrandIn,
+  vendorMismatch, knownBrandIn, dearestFromSkuMap,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -286,4 +286,48 @@ test('a branded mismatch still renders full, carrying the caveat', () => {
   );
   expect(v.render).toBe('full');
   expect(v.note).toBe('listing does not name Otterbox');
+});
+
+// Entry copied verbatim from a live pdp.pc.query payload for 32930388619.
+const SKU_ENTRY = {
+  discount: '5% off',
+  originalPrice: { currency: 'USD', formatedAmount: '$10.32', value: 10.32 },
+  priceFontColor: '#000000',
+  salePriceLocal: '$9.80|9|80',
+  salePriceString: '$9.80',
+  sellerByLot: false,
+};
+
+test('dearestFromSkuMap takes the DEAREST sale price across variants', () => {
+  const map = {
+    a: { ...SKU_ENTRY, salePriceString: '$6.28', salePriceLocal: '$6.28|6|28' },
+    b: { ...SKU_ENTRY, salePriceString: '$7.62', salePriceLocal: '$7.62|7|62' },
+    c: SKU_ENTRY, // $9.80, the measured maximum of the real 24-sku listing
+  };
+  expect(dearestFromSkuMap(map, 'USD')).toBe(9.8);
+});
+
+test('dearestFromSkuMap never reads salePriceLocal, which would 10x the number', () => {
+  // "$9.80|9|80" -> parsePrice takes the max token -> 80. Asserted so nobody "tidies"
+  // the parser onto that field: it fails silently and in the accusing direction.
+  expect(parsePrice(SKU_ENTRY.salePriceLocal)).toBe(80);
+  expect(dearestFromSkuMap({ c: SKU_ENTRY }, 'USD')).toBe(9.8);
+});
+
+test('dearestFromSkuMap ignores originalPrice, the struck-through figure', () => {
+  // originalPrice 10.32 is higher than the sale price and would inflate markup.
+  expect(dearestFromSkuMap({ c: SKU_ENTRY }, 'USD')).not.toBe(10.32);
+});
+
+test('dearestFromSkuMap refuses a currency the caller did not ask for', () => {
+  const ils = { c: { ...SKU_ENTRY, originalPrice: { currency: 'ILS', value: 38 } } };
+  expect(dearestFromSkuMap(ils, 'USD')).toBe(null);
+  // No expectation passed means no cross-currency claim to check.
+  expect(dearestFromSkuMap(ils)).toBe(9.8);
+});
+
+test('dearestFromSkuMap returns null on junk rather than a wrong number', () => {
+  expect(dearestFromSkuMap(null, 'USD')).toBe(null);
+  expect(dearestFromSkuMap({}, 'USD')).toBe(null);
+  expect(dearestFromSkuMap({ a: { salePriceString: 'Free' } }, 'USD')).toBe(null);
 });

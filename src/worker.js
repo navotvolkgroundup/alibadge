@@ -5,7 +5,7 @@
 // endpoint reflects Origin in ACAO rather than sending *, so a web page could not
 // do this, but an extension worker can.
 import {
-  decide, isAllowedImageUrl, urlCacheKey, md5, markupPercent, parsePrice,
+  decide, isAllowedImageUrl, urlCacheKey, md5, markupPercent, parsePrice, dearestFromSkuMap,
 } from './lib.js';
 
 const UPLOAD_HOST = 'https://recom-acs.aliexpress.com'; // no MTOP handshake needed
@@ -203,6 +203,20 @@ async function pdpCall(data, token) {
 
 // Returns the DEAREST variant price in `currency`, or null. Null is a normal outcome
 // (punish, shape change, unlisted item) and must leave the caller with the bound.
+//
+// MEASURED from inside the extension: SUCCESS, ~74KB, and no handshake needed because
+// the cookie is already present. The bun-side FAIL_SYS_USER_VALIDATE was about the
+// client, not the endpoint.
+function findKey(o, name, d = 0) {
+  if (!o || typeof o !== 'object' || d > 8) return null;
+  if (o[name]) return o[name];
+  for (const v of Object.values(o)) {
+    const r = findKey(v, name, d + 1);
+    if (r) return r;
+  }
+  return null;
+}
+
 async function pdpDearest(productId, currency) {
   const data = JSON.stringify({
     productId: String(productId), _currency: currency || CURRENCY,
@@ -214,18 +228,12 @@ async function pdpDearest(productId, currency) {
     log('pdp:', j ? String(j.ret) : 'no response');
     return null;
   }
-  // Scan for price-ish numbers rather than pinning one path: the sku map's shape is
-  // undocumented and has moved before. Guarded by a sanity band so a random id or a
-  // cent value cannot become a price.
-  const nums = [];
-  JSON.stringify(j).replace(/"(?:formattedPrice|minPrice|maxPrice|skuVal|actSkuCalPrice|skuCalPrice)"\s*:\s*"?([\d.,]+)"?/g,
-    (m, n) => { const v = parseFloat(String(n).replace(/,/g, '')); if (v > 0 && v < 1e6) nums.push(v); return m; });
-  if (!nums.length) {
-    // Was silent, which made a punish and a wrong request payload look identical.
-    log('pdp: call succeeded but no price fields matched — ret', String(j.ret));
-    return null;
-  }
-  return Math.max(...nums);
+  // Located by name rather than by path: the envelope is data.result.<...> and has
+  // moved before. The PARSING lives in lib.js with tests against a real entry —
+  // salePriceLocal ("$9.80|9|80") and originalPrice are both traps.
+  const dearest = dearestFromSkuMap(findKey(j, 'skuPriceInfoMap'), currency);
+  if (dearest == null) log('pdp: no usable skuPriceInfoMap — ret', String(j.ret));
+  return dearest;
 }
 
 // Exposed for a one-line check from the service-worker console. Returns a DIAGNOSTIC

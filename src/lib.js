@@ -61,6 +61,41 @@ export function isAllowedImageUrl(raw, pageOrigin) {
 }
 
 // ---------------------------------------------------------------------------
+// Dearest variant, from pdp.pc.query's skuPriceInfoMap
+// ---------------------------------------------------------------------------
+
+// One AliExpress listing spans many variants — measured on 32930388619: 24 skus from
+// $6.28 to $9.80. The search results carry only the CHEAPEST, which inflates markup in
+// the direction that accuses a merchant, so the dearest is the conservative reading.
+//
+// Entry shape, dumped verbatim from a live payload:
+//   { discount: "5% off",
+//     originalPrice: { currency: "USD", formatedAmount: "$10.32", value: 10.32 },
+//     salePriceLocal: "$9.80|9|80",
+//     salePriceString: "$9.80",
+//     sellerByLot: false }
+//
+// TWO TRAPS, both live in that object:
+//  1. salePriceLocal is "$9.80|9|80" — amount, then integer and fraction parts. Handing
+//     it to parsePrice yields 80, a 10x overstatement. Only salePriceString is safe.
+//  2. originalPrice is the struck-through "was" figure, same trap as compare_at_price
+//     store-side. Sale price only.
+export function dearestFromSkuMap(map, expectCurrency) {
+  if (!map || typeof map !== 'object') return null;
+  const prices = [];
+  for (const entry of Object.values(map)) {
+    if (!entry || typeof entry !== 'object') continue;
+    // A currency the caller did not ask for cannot be compared, and silently mixing
+    // them is how a ratio becomes fiction.
+    const cur = entry.originalPrice && entry.originalPrice.currency;
+    if (expectCurrency && cur && cur !== expectCurrency) return null;
+    const p = parsePrice(entry.salePriceString);
+    if (Number.isFinite(p) && p > 0) prices.push(p);
+  }
+  return prices.length ? Math.max(...prices) : null;
+}
+
+// ---------------------------------------------------------------------------
 // Markup floor + brand guard
 // ---------------------------------------------------------------------------
 
