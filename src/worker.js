@@ -252,7 +252,17 @@ self.__alibadgePdp = async (productId, currency = 'USD') => {
     topKeys: j && j.data ? Object.keys(j.data).slice(0, 25) : null,
     priceFieldsFound: nums.length,
     dearest: nums.length ? Math.max(...nums) : null,
-    // First 600 chars, so a shape change is visible without dumping the whole payload.
+    // MEASURED: the extension gets SUCCESS and a 74KB payload, so the request is fine
+    // and the guessed field names were the problem. Report the names that actually
+    // exist with a sample value each, instead of guessing a third time.
+    priceKeys: (() => {
+      const seen = {};
+      raw.replace(/"([A-Za-z_]*(?:[Pp]rice|[Aa]mount|[Vv]alue|[Cc]ent)[A-Za-z_]*)"\s*:\s*("[^"]{0,24}"|[\d.]+)/g,
+        (m, k, v) => { if (!(k in seen)) seen[k] = v; return m; });
+      return seen;
+    })(),
+    // Where the sku list lives, if it is findable by name.
+    skuKeys: [...new Set((raw.match(/"[A-Za-z_]*[Ss]ku[A-Za-z_]*"/g) || []))].slice(0, 30),
     head: raw.slice(0, 600),
   };
 };
