@@ -263,6 +263,28 @@ self.__alibadgePdp = async (productId, currency = 'USD') => {
     })(),
     // Where the sku list lives, if it is findable by name.
     skuKeys: [...new Set((raw.match(/"[A-Za-z_]*[Ss]ku[A-Za-z_]*"/g) || []))].slice(0, 30),
+    // skuPriceInfoMap EXISTS (measured) — so dump one entry verbatim before writing a
+    // parser against it. The payload mixes units and cents (salePriceString "$6.76"
+    // next to originalPriceCent 661), and picking the wrong one is a 100x error on the
+    // exact number that accuses a merchant. Not guessing this one.
+    ...(() => {
+      const find = (o, name, d = 0) => {
+        if (!o || typeof o !== 'object' || d > 8) return null;
+        if (o[name]) return o[name];
+        for (const v of Object.values(o)) { const r = find(v, name, d + 1); if (r) return r; }
+        return null;
+      };
+      const map = find(j, 'skuPriceInfoMap');
+      const keys = map ? Object.keys(map) : [];
+      return {
+        skuCount: keys.length,
+        skuSample: map && keys.length ? JSON.stringify(map[keys[0]]).slice(0, 700) : null,
+        // The spread across variants, straight from the payload, so the max is checkable
+        // by eye against whatever the parser ends up returning.
+        allSalePriceStrings: [...new Set((raw.match(/"salePriceString"\s*:\s*"([^"]+)"/g) || [])
+          .map((x) => x.split('"')[3]))].slice(0, 30),
+      };
+    })(),
     head: raw.slice(0, 600),
   };
 };
