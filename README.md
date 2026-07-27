@@ -176,10 +176,15 @@ in a page:
 await self.__alibadgeLabelset()
 ```
 
+**`Uncaught Error: No SW` means Chrome killed the idle worker** (the card reads
+"service worker (Inactive)"). Load any Shopify product page to wake it, then re-open
+the inspector. The run is resumable for the same reason: every row is written to
+`chrome.storage` as it completes, so a restart costs one item, and re-running continues
+from where it stopped. `__alibadgeLabelsetDump()` prints what has accumulated;
+`__alibadgeLabelset(null, true)` starts over and clears the result cache.
+
 The set is bundled at `labelset/set.json` and loaded via `chrome.runtime.getURL`, so
-this needs no server. It logs `[labelset] 44 items loaded` immediately, a line per
-item, and the full JSON at the end. If `serve.py` is running it also POSTs progress
-after every item, which is convenient but never load-bearing.
+this needs no server.
 
 ```
 bun labelset/score.js labelset/harvest.json   # if the POST worked

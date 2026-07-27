@@ -565,16 +565,23 @@ async function judge(extraction, found) {
 // the number. Inside a loaded extension both calls work; that is the whole reason
 // this lives in the worker instead of in labelset/run.js.
 //
-// Paste-once from the extension's service-worker console:
-//   await self.__alibadgeLabelset('http://127.0.0.1:8899/_items.json')
+// From the extension's service-worker console:
+//   await self.__alibadgeLabelset()          // resumes; re-run until COMPLETE
+//   await self.__alibadgeLabelset(null, true) // start over, clearing the result cache
+//   await self.__alibadgeLabelsetDump()      // print stored rows without running
 //
 // Goes through the same enqueue() and the same lookup() a real page does, so the
 // measurement grades shipped behaviour rather than a parallel implementation.
-self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest', fresh = true) => {
-  // Default to the set BUNDLED WITH THE EXTENSION. Two runs produced nothing because
-  // the very first line fetched http://127.0.0.1 — unguarded, so it threw before
-  // logging anything, and a blocked private-network request looked exactly like
-  // pasting into the wrong console. An extension URL cannot fail that way.
+//
+// If the console says "No SW", Chrome has killed the idle worker. Load any Shopify
+// product page to wake it, then re-open the service-worker inspector.
+// MV3 kills an idle worker, so this run must survive a restart: every row is written
+// to chrome.storage as it completes, and a re-run resumes where it stopped instead of
+// re-spending 40 uploads. Rows whose reason means "no comparison happened" are retried.
+const LS_KEY = 'labelsetRows';
+const LS_RETRY = /^(punished|no_results|upload_failed|image_fetch_failed|harness_error|worker_error|rate_capped)/;
+
+self.__alibadgeLabelset = async (itemsUrl, fresh = false) => {
   const url = itemsUrl || chrome.runtime.getURL('labelset/set.json');
   let items;
   try {
@@ -583,18 +590,26 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
     console.error(`[labelset] could not load the set from ${url}: ${e}`);
     return null;
   }
-  // A measurement must not answer from cache: entries predating the currency cookie
-  // hold ILS-priced candidates, and entries predating the pdp lookup carry no
-  // dearest-variant flag. Both would be scored as if they were current behaviour.
+
+  const store = await chrome.storage.local.get(LS_KEY);
+  const rows = new Map((store[LS_KEY] || []).map((r) => [r.id, r]));
   if (fresh) {
+    // Only on request: entries predating the currency cookie hold ILS candidates and
+    // entries predating pdp carry no dearest flag, both of which would be scored as
+    // current behaviour. Costs a full re-search of everything.
     const keys = Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith('c:'));
     await chrome.storage.local.remove(keys);
-    console.log(`[labelset] cleared ${keys.length} cache entries`);
+    rows.clear();
+    console.log(`[labelset] fresh: cleared ${keys.length} cache entries and all prior rows`);
   }
-  console.log(`[labelset] ${items.length} items loaded from ${url}, starting`);
-  const out = [];
-  let postOk = true;
-  for (const [n, it] of items.entries()) {
+
+  const todo = items.filter((i) => {
+    const r = rows.get(i.id);
+    return !r || (r.reasons || []).some((x) => LS_RETRY.test(x));
+  });
+  console.log(`[labelset] ${items.length} items · done ${items.length - todo.length} · pending ${todo.length}`);
+
+  for (const [n, it] of todo.entries()) {
     const extraction = {
       url: `https://${it.host}/products/x`, host: it.host, title: it.title,
       vendor: it.vendor, price: it.price, currency: it.currency, image: it.image,
@@ -605,34 +620,39 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
     } catch (e) {
       v = { render: 'none', reasons: ['harness_error'], error: String(e).slice(0, 80) };
     }
-    out.push({
+    rows.set(it.id, {
       id: it.id, bucket: it.bucket, fp: it.fp, host: it.host, title: it.title,
       vendor: it.vendor, price: it.price, currency: it.currency,
       render: v.render, reasons: v.reasons || [], note: v.note || null,
       aliPrice: v.aliPrice ?? null, aliCurrency: v.aliCurrency ?? null,
       aliTitle: v.aliTitle ?? null, aliUrl: v.aliUrl ?? null, markup: v.markup ?? null,
-      // Whether the number is a measurement or an upper bound. From bun pdp is
-      // punished on every call, so a run out there can only ever produce bounds.
+      // Whether the number is a measurement or an upper bound.
       priceBasis: v.priceBasis ?? null,
     });
-    console.log(`[labelset] ${n + 1}/${items.length} ${it.bucket} ${v.render} ` +
+    // After EVERY item, so a worker restart costs one item and not the run.
+    await chrome.storage.local.set({ [LS_KEY]: [...rows.values()] });
+    console.log(`[labelset] ${n + 1}/${todo.length} ${it.bucket} ${v.render} ` +
       `${(v.reasons || []).join(',')} ${it.id}`);
-    // Opportunistic: nice when it works, never load-bearing.
-    if (postOk) {
-      try {
-        const r = await fetch(postTo, { method: 'POST', headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(out) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-      } catch (e) {
-        postOk = false;
-        console.warn(`[labelset] POST to ${postTo} failed (${String(e).slice(0, 60)}) — ` +
-          'continuing; copy the JSON logged at the end instead.');
-      }
-    }
   }
-  console.log('[labelset] done,', out.length, 'items');
-  console.log('[labelset] JSON:\n' + JSON.stringify(out));
-  return out;
+
+  const all = [...rows.values()];
+  const pending = items.filter((i) => {
+    const r = rows.get(i.id);
+    return !r || (r.reasons || []).some((x) => LS_RETRY.test(x));
+  }).length;
+  console.log(`[labelset] ${all.length}/${items.length} measured, ${pending} still pending` +
+    (pending ? ' — re-run to continue' : ' — COMPLETE'));
+  console.log('[labelset] JSON:\n' + JSON.stringify(all));
+  return { measured: all.length, pending };
+};
+
+// Print the accumulated rows without running anything, e.g. after a worker restart.
+self.__alibadgeLabelsetDump = async () => {
+  const store = await chrome.storage.local.get(LS_KEY);
+  const all = store[LS_KEY] || [];
+  console.log(`[labelset] ${all.length} rows stored`);
+  console.log(JSON.stringify(all));
+  return all.length;
 };
 
 // Run the whole pipeline for one product URL from the service-worker console, so a
