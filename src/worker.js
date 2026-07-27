@@ -6,6 +6,7 @@
 // do this, but an extension worker can.
 import {
   decide, isAllowedImageUrl, urlCacheKey, md5, markupPercent, parsePrice, dearestFromSkuMap,
+  buildGate, stripAlicdnSize, HASH_MAX_DISTANCE,
 } from './lib.js';
 
 const UPLOAD_HOST = 'https://recom-acs.aliexpress.com'; // no MTOP handshake needed
@@ -438,6 +439,63 @@ async function encodeForUpload(buf) {
   }
 }
 
+// dHash: 9x8 greyscale, one bit per horizontal gradient. Scale- and re-encode-invariant,
+// which is exactly what a store does to a supplier photo before publishing it.
+async function dhashOf(blobOrBuf) {
+  try {
+    const bmp = await createImageBitmap(blobOrBuf instanceof Blob ? blobOrBuf : new Blob([blobOrBuf]));
+    const c = new OffscreenCanvas(9, 8);
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0, 9, 8);
+    bmp.close();
+    const { data } = g.getImageData(0, 0, 9, 8);
+    // Rec. 601 luma, the same weighting Pillow's "L" mode uses — the offline
+    // measurement that set HASH_MAX_DISTANCE was taken with Pillow.
+    const lum = [];
+    for (let i = 0; i < data.length; i += 4) {
+      lum.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    }
+    let bits = '';
+    for (let r = 0; r < 8; r++) {
+      for (let col = 0; col < 8; col++) bits += lum[r * 9 + col] < lum[r * 9 + col + 1] ? '1' : '0';
+    }
+    return bits;
+  } catch (e) {
+    log('dhash failed', String(e).slice(0, 60));
+    return null;
+  }
+}
+
+// Hash the top candidates so decide() can tell "the same photograph" from "the same
+// category". Bounded: each fetch is a small CDN image, but 60 would be absurd and the
+// answer lives at the top of the ranking.
+const GATE_CANDIDATES = 8;
+
+async function gateFor(storeBuf, results) {
+  const storeHash = await dhashOf(storeBuf);
+  if (!storeHash) return null;
+  const head = results.slice(0, GATE_CANDIDATES);
+  const hashed = await Promise.all(head.map(async (item) => {
+    if (!item.image) return { item, hash: null };
+    try {
+      // stripAlicdnSize: a padded 220px thumbnail scores far from a full-size store
+      // photo even when the two are the same image.
+      const res = await fetch(stripAlicdnSize(item.image), { credentials: 'omit' });
+      if (!res.ok) return { item, hash: null };
+      return { item, hash: await dhashOf(await res.blob()) };
+    } catch {
+      return { item, hash: null };
+    }
+  }));
+  const gate = buildGate(storeHash, hashed);
+  const passing = gate.filter((x) => x.passes);
+  log(`gate: ${passing.length}/${gate.length} within ${HASH_MAX_DISTANCE} — ` +
+    `distances ${gate.map((x) => (x.distance === Infinity ? '-' : x.distance)).join(',')}`);
+  // Candidates beyond the hashed head keep their rank-based place behind the gate, but
+  // only if nothing closer passed; pickWinner() already prefers the smallest distance.
+  return gate;
+}
+
 async function thumb(url, px = 260) {
   if (!url) return null;
   try {
@@ -503,12 +561,22 @@ async function lookup(extraction, pageOrigin) {
   // Cache the SEARCH, not the verdict — see judge(). Empty results are the one
   // transient case that reaches here (every other failure returned early), and
   // caching those turned one bad minute into a week of silence.
+  // Hash-gate BEFORE caching, and store the DISTANCES rather than pass/fail, so a cache
+  // hit is still gated and a threshold change takes effect without re-fetching images.
+  if (results.length) {
+    const gate = await gateFor(buf, results);
+    if (gate) {
+      const byId = new Map(gate.map((x) => [x.item.productId, x.distance]));
+      results = results.map((r) => ({ ...r, d: byId.has(r.productId) ? byId.get(r.productId) : null }));
+    }
+  }
+
   // Upgrade the WINNER's price to its dearest variant, once, before caching — so the
   // corrected number is what gets stored and a cache hit never re-issues the call.
   // Done here rather than in judge() for exactly that reason: judge() runs on every
   // cached page view, and a per-view pdp call multiplies punish risk for nothing.
   if (results.length) {
-    const provisional = decide(extraction, results, null);
+    const provisional = decide(extraction, results, gateFromStored(results));
     if (provisional.winner) {
       const dearest = await pdpDearest(provisional.winner.productId, extraction.currency);
       const current = parsePrice(provisional.winner.price);
@@ -544,13 +612,26 @@ async function lookup(extraction, pageOrigin) {
 // a decision-logic fix has been invisible because a stale verdict was replayed
 // from storage, and bumping CACHE_V each time only defers the next occurrence.
 // Re-deciding on every read costs one function call and makes that class impossible.
+// Rebuild the gate from distances stored on the cached results. Candidates that were
+// never hashed (beyond GATE_CANDIDATES, or whose image fetch failed) carry null and
+// cannot win: a missing hash is not evidence of a match.
+function gateFromStored(results) {
+  if (!results.some((r) => r.d != null)) return null;
+  return results.map((item) => ({
+    item,
+    distance: item.d == null ? Infinity : item.d,
+    passes: item.d != null && item.d <= HASH_MAX_DISTANCE,
+  }));
+}
+
 async function judge(extraction, found) {
   const { fileId, results } = found;
 
-  // ponytail: no perceptual hash yet — AliExpress's own result rank IS a visual
-  // similarity signal, and the brand guard + markup floor still gate. Add
-  // blockhash when rank measurably admits wrong matches.
-  const verdict = decide(extraction, results, null);
+  // The gate rank alone could not provide. MEASURED: ungated, the labelled run produced
+  // 7 badges of which 4 were false accusations against Spigen; gated at distance 10, 1
+  // badge and 0 false. It also rejects the winner collapse — three different cutlery
+  // sets that all matched one listing whose photo sits 31-36 bits from theirs.
+  const verdict = decide(extraction, results, gateFromStored(results));
 
   const out = {
     render: verdict.render,

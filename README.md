@@ -56,14 +56,19 @@ dark timeline, so the composition can be iterated without reloading the extensio
    appKey 24815441, on `recom-acs.aliexpress.com`. Returns a `fileId`.
 3. **Results** — `POST /fn/search-pc/index` with `{isNewImageSearch:"y", filename:<fileId>}`.
    Returns **60** items at `data.data.root.fields.mods.itemList.content`. Needs no cookies.
-4. **Dearest variant** — ONE `pdp.pc.query` for the winner only, before the cache write,
+4. **Hash gate** — dHash 9x8 of the store photo against the top 8 candidates' originals,
+   `distance <= 10` to pass. Rank alone cannot tell "the same photograph" from "the same
+   category": MEASURED ungated, the labelled run gave 7 badges of which **4 were false
+   accusations against Spigen**; gated, 1 badge and 0 false. Distances are stored on the
+   cached results, not pass/fail, so a threshold change applies without re-fetching.
+5. **Dearest variant** — ONE `pdp.pc.query` for the winner only, before the cache write,
    so a cache hit never re-issues it. Verified working inside the extension; returns null
    on a punish and the badge degrades to the bound rather than disappearing.
    `self.__alibadgePdp('<productId>')` dumps the payload shape if it ever moves.
-5. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
+6. **Currency** — `withStoreCurrency()` sets the `aep_usuc_f` cookie to the store's
    currency around the results call, so all 60 candidates arrive already comparable, then
    restores whatever the user had. No FX rate exists anywhere in this extension.
-6. **Decide** — `decide()` owns the render policy and returns all failing reasons.
+7. **Decide** — `decide()` owns the render policy and returns all failing reasons.
 
 Verified live end-to-end on 2026-07-26: handshake → 180,488-char base64 upload → 60 items
 with prices and sold counts.
@@ -98,6 +103,9 @@ with prices and sold counts.
   to `parsePrice` returns **80**, a 10x overstatement in the accusing direction. And
   `originalPrice` is the struck-through figure. Only `salePriceString` is safe, and
   `dearestFromSkuMap()` in lib.js is tested against a verbatim live entry for both.
+- **Hash the ORIGINAL alicdn image, not the thumbnail.** Result images arrive as
+  `...jpg_220x220q75.jpg_.webp`; a padded 220px thumbnail scores far from a full-size
+  store photo even when the two are the same image. `stripAlicdnSize()` exists for this.
 - **Large images silently fail the upload.** No `fileId`, no error. Measured: Stanley
   7.0MB PNG, Otterbox 1.9MB, Anker 870KB all failed; Spigen's 70KB JPEG worked. That
   cost 9 of 16 hard negatives in the labelled run — most of the bucket the primary
@@ -153,10 +161,6 @@ with prices and sold counts.
   returns a single price per listing, so there is no variant data to render. Omitted rather
   than invented, per the doc's own rule. Add it if the PDP lookup lands (it returns a full
   `skuPriceInfoMap`).
-- **Perceptual hash gate (blockhash).** `decide()` takes a `gate` argument and currently
-  gets `null`, falling back to AliExpress's own result rank — which is itself a visual
-  similarity signal, with the brand guard and markup floor still gating. Add blockhash
-  when rank measurably admits wrong matches.
 - **Design tokens.** Currently a monospace stack in the badge CSS. The doc calls for a
   named display face with tabular numerals — deliberately not `system-ui`.
 

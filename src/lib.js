@@ -61,6 +61,50 @@ export function isAllowedImageUrl(raw, pageOrigin) {
 }
 
 // ---------------------------------------------------------------------------
+// Perceptual hash gate — "is this the SAME photograph, or just the same category?"
+// ---------------------------------------------------------------------------
+
+// MEASURED 2026-07-27, dHash 9x8 Hamming distance, store photo vs the winner's gallery:
+//
+//   0, 3, 3   |   26, 28, 30, 31, 32, 32, 33, 33, 36
+//
+// Nothing in between. The low cluster is genuine supplier-photo reuse (warmlydecor's
+// matte-black set matches at 0, pixel-identical; two petclever toys at 3). Everything
+// from 26 up is the same CATEGORY with a different photograph — including all four
+// Spigen watch bands, which were being badged as dropshipping.
+//
+// Ungated, the labelled run produced 7 badges of which 4 were false. At any threshold
+// from 5 to 25 it produced 1 badge, 0 false. 10 sits in the middle of the gap.
+export const HASH_MAX_DISTANCE = 10;
+
+export function hamming(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return null;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++;
+  return d;
+}
+
+// alicdn serves derived sizes as suffixes: ".../Hab12.jpg_220x220q75.jpg_.webp".
+// Hashing a padded 220px thumbnail against a full-size store photo inflates the
+// distance for images that are actually identical, so always hash the original.
+export function stripAlicdnSize(url) {
+  if (typeof url !== 'string') return url;
+  const m = /^(https?:\/\/[^?#]*?\.(?:jpg|jpeg|png|webp))_/i.exec(url);
+  return m ? m[1] : url;
+}
+
+// Shapes the gate pickWinner() already expects: {item, distance, passes}. Candidates
+// whose hash could not be computed do NOT pass — a missing hash is not evidence of a
+// match, and this is the gate that stops false accusations.
+export function buildGate(storeHash, candidates, max = HASH_MAX_DISTANCE) {
+  if (!storeHash || !Array.isArray(candidates)) return null;
+  return candidates.map(({ item, hash }) => {
+    const distance = hash ? hamming(storeHash, hash) : null;
+    return { item, distance: distance == null ? Infinity : distance, passes: distance != null && distance <= max };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Dearest variant, from pdp.pc.query's skuPriceInfoMap
 // ---------------------------------------------------------------------------
 

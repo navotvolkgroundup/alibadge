@@ -7,6 +7,7 @@ import {
   decide, pickWinner, urlCacheKey, markupPercent, md5,
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
   vendorMismatch, knownBrandIn, dearestFromSkuMap,
+  hamming, stripAlicdnSize, buildGate, HASH_MAX_DISTANCE,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -338,4 +339,59 @@ test('a real markup is no longer suppressed by junk in the result tail', () => {
     [top, ...near, ...junk], null);
   expect(d.reasons).toEqual([]);
   expect(d.render).toBe('full');
+});
+
+// --- perceptual hash gate ----------------------------------------------------
+
+test('hamming counts differing bits and refuses mismatched inputs', () => {
+  expect(hamming('0000', '0000')).toBe(0);
+  expect(hamming('0000', '1010')).toBe(2);
+  expect(hamming('0000', '000')).toBe(null);
+  expect(hamming('0000', null)).toBe(null);
+});
+
+test('stripAlicdnSize returns the original image, not a padded thumbnail', () => {
+  // Hashing a 220px padded thumbnail against a full-size store photo inflates the
+  // distance for images that are byte-identical in origin.
+  expect(stripAlicdnSize('https://ae01.alicdn.com/kf/Hab12.jpg_220x220q75.jpg_.webp'))
+    .toBe('https://ae01.alicdn.com/kf/Hab12.jpg');
+  expect(stripAlicdnSize('https://ae01.alicdn.com/kf/Hab12.jpg'))
+    .toBe('https://ae01.alicdn.com/kf/Hab12.jpg');
+  expect(stripAlicdnSize(null)).toBe(null);
+});
+
+test('buildGate passes only close matches, and never an unhashable one', () => {
+  const store = '1'.repeat(64);
+  const near = '1'.repeat(60) + '0000';        // distance 4
+  const far = '0'.repeat(64);                  // distance 64
+  const g = buildGate(store, [
+    { item: { productId: 'near' }, hash: near },
+    { item: { productId: 'far' }, hash: far },
+    { item: { productId: 'unhashed' }, hash: null },
+  ]);
+  expect(g.map((x) => x.passes)).toEqual([true, false, false]);
+  expect(g[0].distance).toBe(4);
+  // A missing hash must never pass: absence of evidence is not a match.
+  expect(g[2].distance).toBe(Infinity);
+});
+
+test('decide goes link-only when the gate rejects every candidate', () => {
+  // The Spigen case: a real brand whose photo matches nothing on AliExpress. Ungated
+  // this rendered a full badge at 13x against a $2.29 generic band.
+  const results = [{ productId: '1', price: '$2.29', currency: 'USD', title: 'Metal Watch Strap 20mm' }];
+  const gate = buildGate('1'.repeat(64), [{ item: results[0], hash: '0'.repeat(64) }]);
+  const d = decide({ price: 29.99, currency: 'USD', host: 'www.spigen.com', vendor: 'Spigen',
+    title: 'Galaxy Watch 9 Thin Fit 360' }, results, gate);
+  expect(d.render).toBe('link-only');
+  expect(d.reasons).toContain('no_passing_match');
+});
+
+test('decide still badges when the gate confirms the same photograph', () => {
+  // warmlydecor matte-black: measured distance 0, pixel-identical supplier photo.
+  const results = [{ productId: '1', price: '$18.21', currency: 'USD', title: 'Cutlery Set 24pcs' }];
+  const same = '1'.repeat(64);
+  const d = decide({ price: 70.95, currency: 'USD', host: 'warmlydecor.com', vendor: 'Warmly',
+    title: 'Matte Black Cutlery Set' }, results, buildGate(same, [{ item: results[0], hash: same }]));
+  expect(d.render).toBe('full');
+  expect(d.reasons).toEqual([]);
 });
