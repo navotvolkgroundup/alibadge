@@ -92,6 +92,12 @@ with prices and sold counts.
 - **Never scrape the results DOM** — it renders 12 of the 60 items the API returns.
 - **`salePrice`, never `originalPrice`** — originalPrice is the struck-through figure and
   inflates markup, exactly like `compare_at_price` store-side.
+- **The results payload has no dearest-variant price.** Dumped 2026-07-27 across 60
+  items: `salePrice.minPrice` and nothing else — no max, no `skuPriceInfoMap`, and
+  `formattedPrice` is never a range, so `parsePrice`'s range-max path never fires here.
+  Every markup is therefore an **upper bound**, and `PRICE_BASIS` in `content.js` says
+  so on the receipt. Do not restore a "dearest variant" claim without a per-product
+  call to back it.
 - **Don't add the `tabs` permission.** `changeInfo.url` is populated already because
   `host_permissions` covers the tab.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
@@ -118,6 +124,10 @@ with prices and sold counts.
   ceiling suppresses the genuine dropshippers this exists to find.
 
 ## Not built yet
+
+- **Conservative variant pricing.** One `pdp.pc.query` call for the winner only, tried
+  from *inside* the extension where the punish may not apply. Would turn the upper
+  bound into a measurement. Until then the receipt states the bound.
 
 - **Per-variant price table on the receipt.** The approved mockup has one; the results API
   returns a single price per listing, so there is no variant data to render. Omitted rather
