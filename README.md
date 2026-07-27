@@ -5,11 +5,31 @@ product and the markup — without being asked.
 
 Design doc: `~/.gstack/projects/navotvolkgroundup-nabot/navotv-main-design-20260725-141510.md`
 
-## Install (v1 is load-unpacked by design)
+## Install
+
+`./build.sh` produces `dist/alibadge-<version>.zip` — tests first, then a bundle carrying
+only what the extension runs (no tests, no `labelset/`, which holds measurement records).
 
 1. `chrome://extensions` → enable Developer mode
-2. **Load unpacked** → select this directory
-3. Visit a Shopify product page (try `warmlydecor.com`)
+2. **Load unpacked** → select this directory (or unzip the bundle and select that)
+3. The options page opens. **Nothing is uploaded until you enable it there.**
+4. Visit a Shopify product page (try `warmlydecor.com/products/caleb-modern-cutlery-set`)
+
+## Two independent things must hold before a NUMBER appears
+
+Either one alone is not enough, and this is the whole safety design:
+
+1. **The photograph must match** — dHash distance ≤ 10 against the marketplace listing.
+2. **The store must carry importer plumbing** — DSers/CJ/Inspire-Uplift SKU and filename
+   shapes, from `importerSignature()`.
+
+(2) exists because (1) is symmetric. A hash proves two photos are the same image; it
+cannot say who copied whom, and AliExpress sellers routinely lift brand photography.
+MEASURED: all four Misen carbon-steel pans passed the hash gate at 5-10 bits and were
+stopped only by the price floor. Requiring importer plumbing closes that and costs
+nothing on the labelled set — both measured true positives carry DSers signatures.
+
+Without (2) the badge still links to the search. It just never states a percentage.
 
 Debug logging: `chrome.storage.local.set({ alibadgeDebug: true })` from the extension's
 service-worker console, then reload the page. Silence is the default state, so this is

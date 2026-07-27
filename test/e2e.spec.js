@@ -34,11 +34,19 @@ function pageHtml({ title, price, currency, vendor }) {
   </body></html>`;
 }
 
-function productJson({ title, price, currency, vendor }) {
+// `dsers` plants real importer plumbing — a DSers SKU shape and a product-image-<digits>
+// filename, both copied from warmlydecor. decide() requires this before showing a NUMBER,
+// because a matching photo alone cannot say who copied whom.
+function productJson({ title, price, currency, vendor, dsers }) {
   return JSON.stringify({
     title, vendor, currency,
-    variants: [{ id: 1, price: String(Math.round(price * 100)), featured_image: null }],
-    images: ['//cdn.shopify.com/s/files/1/0/0/hero.jpg'],
+    variants: [{
+      id: 1, price: String(Math.round(price * 100)), featured_image: null,
+      sku: dsers ? '35030427-china-1-sets-4pcs' : 'MSN-CS-8',
+    }],
+    images: [dsers
+      ? '//cdn.shopify.com/s/files/1/0/0/product-image-1410527736.jpg'
+      : '//cdn.shopify.com/s/files/1/0/0/hero.jpg'],
   });
 }
 
@@ -109,11 +117,19 @@ const CHEAP = [{
   image: 'https://ae01.alicdn.com/kf/x.jpg',
 }];
 
+// A generic folio at a fraction of the price — visually close, provably not the same
+// product. The i-cell false positive in one object.
+const LOOKALIKE = [{
+  productId: '1', price: '$44.60', currency: 'USD', title: 'Shockproof Folio Case for iPad Air 11',
+  url: 'https://www.aliexpress.com/item/2.html', image: 'https://ae01.alicdn.com/kf/z.jpg',
+}];
+
 const badge = (page) => page.locator('#alibadge-root');
 
 test('fires on a dropship product and shows the markup', async ({ page }) => {
   await loadProduct(page, {
     title: 'Royal Vintage Cutlery Set', price: 84.95, currency: 'USD', vendor: 'WarmlyDecor',
+    dsers: true,
   }, CHEAP);
 
   await expect(badge(page)).toBeAttached({ timeout: 15000 });
@@ -164,23 +180,24 @@ test('HARD NEGATIVE: goes silent, and for the named reason', async ({ page }) =>
   expect(verdict.reasons).toContain('ratio_implausible');
 });
 
-test('a brand caveat renders WITH the number instead of suppressing it', async ({ page }) => {
-  // The i-cell case: suppressing this discarded a genuinely cheaper listing for the
-  // same item. The number shows; the caveat shows with it.
+test('a legitimate retailer gets the link, never the number', async ({ page }) => {
+  // The i-cell case, and this test used to assert a full badge at +570% — which was the
+  // false accusation itself. i-cell.co.il is a 15-branch chain selling a LICENSED
+  // Otterbox: no importer plumbing, so no percentage. The link survives, so a shopper
+  // can still go and look.
   // Host matters: vendor is the shop's OWN name here, so the vendor path must stay
-  // quiet and the brand token in the title must be what speaks. Ran first against a
-  // generic fixture host and got 'listing does not name iCell' — correct behaviour
-  // for a vendor that does not resemble the domain, wrong fixture for this case.
-  await loadProduct(page, {
+  // quiet and the brand token in the title must be what speaks.
+  const seen = await loadProduct(page, {
     title: 'Otterbox Symmetry Folio for iPad Air 11', price: 299, currency: 'USD', vendor: 'iCell',
-  }, [{
-    productId: '1', price: '$44.60', currency: 'USD', title: 'Shockproof Folio Case for iPad Air 11',
-    url: 'https://www.aliexpress.com/item/2.html', image: 'https://ae01.alicdn.com/kf/z.jpg',
-  }], 'www.i-cell.co.il');
+  }, LOOKALIKE, 'www.i-cell.co.il');
 
   await expect(badge(page)).toBeAttached({ timeout: 15000 });
-  await expect(badge(page).locator('[data-mk]')).toHaveText('+570%');
-  await expect(badge(page).locator('[data-sub]')).toContainText('otterbox is a brand name');
+  // No number, and the receipt button stays hidden — there is nothing defensible to post.
+  await expect(badge(page).locator('[data-mk]')).toHaveText('·····');
+  await expect(badge(page).locator('[data-copy]')).toBeHidden();
+  const v = decide(seen[0], LOOKALIKE, null);
+  expect(v.render).toBe('link-only');
+  expect(v.reasons).toContain('no_importer_signature');
 });
 
 test('the receipt basis follows the data, it is not asserted', async ({ page }) => {
@@ -188,6 +205,7 @@ test('the receipt basis follows the data, it is not asserted', async ({ page }) 
   // a whole period after the code that produced dearest prices was deleted.
   const seen = await loadProduct(page, {
     title: 'Royal Vintage Cutlery Set', price: 84.95, currency: 'USD', vendor: 'WarmlyDecor',
+    dsers: true,
   }, CHEAP);
   await expect(badge(page)).toBeAttached({ timeout: 15000 });
   // CHEAP carries no basis flag, so the bound must be claimed — never 'dearest'.

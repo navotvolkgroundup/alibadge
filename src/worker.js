@@ -38,8 +38,11 @@ console.log('[alibadge] worker alive');
 // produced a receipt carrying a caveat the shipped logic cannot generate, a basis
 // string deleted two commits earlier, and yesterday's capture date — all of it real
 // output from stale code. Stamp the update time so a stale page can notice.
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ updatedAt: Date.now() });
+chrome.runtime.onInstalled.addListener(async ({ reason }) => {
+  await chrome.storage.local.set({ updatedAt: Date.now() });
+  // Ask before uploading anything. On a fresh install that means the options page, not a
+  // badge that has already sent a photo to a third party.
+  if (reason === 'install') chrome.runtime.openOptionsPage();
 });
 
 // --- serial queue + token bucket --------------------------------------------
@@ -472,7 +475,11 @@ async function dhashOf(blobOrBuf) {
 // Hash the top candidates so decide() can tell "the same photograph" from "the same
 // category". Bounded: each fetch is a small CDN image, but 60 would be absurd and the
 // answer lives at the top of the ranking.
-const GATE_CANDIDATES = 8;
+// 16, not 8: recall measured 2 of 8 on the labelled set, and the cheapest honest lever
+// is looking further down the ranking for a photo match. Each fetch is a small CDN
+// image. Most misses are genuine absence of reuse (distances 21-30), so do not expect
+// much — but it costs little and it is the only recall lever that adds no risk.
+const GATE_CANDIDATES = 16;
 
 async function gateFor(storeBuf, results) {
   const storeHash = await dhashOf(storeBuf);
@@ -483,9 +490,20 @@ async function gateFor(storeBuf, results) {
     try {
       // stripAlicdnSize: a padded 220px thumbnail scores far from a full-size store
       // photo even when the two are the same image.
-      const res = await fetch(stripAlicdnSize(item.image), { credentials: 'omit' });
-      if (!res.ok) return { item, hash: null };
-      return { item, hash: await dhashOf(await res.blob()) };
+      // Ad blockers routinely block aliexpress-media.com, and with the gate failing
+      // closed that turns into silence on every page. The same object is served from
+      // alicdn under the same path, so try both hosts before giving up.
+      const primary = stripAlicdnSize(item.image);
+      const alt = primary.replace(/^https?:\/\/[^/]*aliexpress-media\.com\//, 'https://ae01.alicdn.com/');
+      for (const url of alt !== primary ? [primary, alt] : [primary]) {
+        try {
+          const res = await fetch(url, { credentials: 'omit' });
+          if (!res.ok) continue;
+          const hash = await dhashOf(await res.blob());
+          if (hash) return { item, hash };
+        } catch { /* try the next host */ }
+      }
+      return { item, hash: null };
     } catch {
       return { item, hash: null };
     }
@@ -520,6 +538,13 @@ async function thumb(url, px = 260) {
 // --- pipeline ----------------------------------------------------------------
 
 async function lookup(extraction, pageOrigin) {
+  // Nothing leaves the browser before the user has agreed to it. This extension uploads
+  // the product photo of every page it runs on to Alibaba infrastructure, and doing that
+  // silently on someone else's browsing is not defensible however useful the result is.
+  // Set in options.html; the first run opens it.
+  const { consent } = await chrome.storage.local.get('consent');
+  if (consent !== true) return { render: 'none', reasons: ['no_consent'] };
+
   const urlKey = urlCacheKey(extraction.url);
   const early = urlKey ? await cacheGet([urlKey]) : null;
   if (early) { log('cache hit (url)'); return judge(extraction, early); }

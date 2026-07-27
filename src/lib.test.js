@@ -7,7 +7,7 @@ import {
   decide, pickWinner, urlCacheKey, markupPercent, md5,
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
   vendorMismatch, knownBrandIn, dearestFromSkuMap,
-  hamming, stripAlicdnSize, buildGate, HASH_MAX_DISTANCE,
+  hamming, stripAlicdnSize, buildGate, HASH_MAX_DISTANCE, importerSignature,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -121,7 +121,10 @@ test('knownBrandIn finds the mark the store itself names', () => {
 
 // --- decide() ----------------------------------------------------------------
 
-const store = { price: 84.95, currency: 'USD', title: 'Royal Vintage Cutlery Set', host: 'warmlydecor.com' };
+// warmlydecor carries real DSers plumbing, so the fixture carries it too: a NUMBER now
+// requires independent evidence of who copied whom. See importerSignature().
+const store = { price: 84.95, currency: 'USD', title: 'Royal Vintage Cutlery Set',
+  host: 'warmlydecor.com', importer: ['dsers_sku', 'dsers_image'] };
 const results = [
   { productId: '1', price: '$9.72', currency: 'USD' },
   { productId: '2', price: '$35.97', currency: 'USD' },
@@ -271,8 +274,14 @@ test('vendorMismatch ignores a vendor that is just the shop name', () => {
     'Luxury Gold Stainless Steel Cutlery Set 24pc')).toBe(false);
 });
 
-test('a branded mismatch still renders full, carrying the caveat', () => {
-  // The measured i-cell case: suppressing it threw away a true find.
+test('the i-cell case: caveat still travels, but a NUMBER now needs evidence', () => {
+  // This test used to assert `full`, and that assertion was the false accusation itself:
+  // i-cell.co.il is a 15-branch chain selling a LICENSED Otterbox. It has no importer
+  // plumbing, so it gets the link and the caveat, and not the number.
+  //
+  // The earlier decision stands unchanged — a brand mismatch is a printed caveat, not
+  // silence. What changed is that the caveat is no longer the ONLY thing standing
+  // between a legitimate retailer and a published percentage.
   const v = decide(
     { price: 299, currency: 'ILS', host: 'i-cell.co.il', vendor: 'Otterbox',
       title: 'כיסוי Otterbox ל iPad Air 11"' },
@@ -280,7 +289,8 @@ test('a branded mismatch still renders full, carrying the caveat', () => {
        url: 'https://x', image: 'https://y' }],
     null,
   );
-  expect(v.render).toBe('full');
+  expect(v.render).toBe('link-only');
+  expect(v.reasons).toContain('no_importer_signature');
   expect(v.note).toBe('listing does not name Otterbox');
 });
 
@@ -335,8 +345,8 @@ test('a real markup is no longer suppressed by junk in the result tail', () => {
   const top = { productId: '1', price: '$7.00', currency: 'USD', title: 'Cutlery Set 24pc' };
   const near = [2, 3, 4].map((i) => ({ ...top, productId: String(i), price: '$8.00' }));
   const junk = [5, 6].map((i) => ({ ...top, productId: String(i), price: '$0.06' }));
-  const d = decide({ price: 84.95, currency: 'USD', host: 'warmlydecor.com', vendor: 'Warmly', title: 'Cutlery' },
-    [top, ...near, ...junk], null);
+  const d = decide({ price: 84.95, currency: 'USD', host: 'warmlydecor.com', vendor: 'Warmly',
+    title: 'Cutlery', importer: ['dsers_sku'] }, [top, ...near, ...junk], null);
   expect(d.reasons).toEqual([]);
   expect(d.render).toBe('full');
 });
@@ -391,7 +401,8 @@ test('decide still badges when the gate confirms the same photograph', () => {
   const results = [{ productId: '1', price: '$18.21', currency: 'USD', title: 'Cutlery Set 24pcs' }];
   const same = '1'.repeat(64);
   const d = decide({ price: 70.95, currency: 'USD', host: 'warmlydecor.com', vendor: 'Warmly',
-    title: 'Matte Black Cutlery Set' }, results, buildGate(same, [{ item: results[0], hash: same }]));
+    title: 'Matte Black Cutlery Set', importer: ['dsers_sku'] }, results,
+    buildGate(same, [{ item: results[0], hash: same }]));
   expect(d.render).toBe('full');
   expect(d.reasons).toEqual([]);
 });
@@ -407,4 +418,42 @@ test('an absent gate must reject, never fall back to rank', () => {
     title: 'כיסוי Otterbox ל iPad Air 11' }, results, emptyGate);
   expect(d.render).toBe('link-only');
   expect(d.reasons).toContain('no_passing_match');
+});
+
+// --- importer signature ------------------------------------------------------
+
+test('importerSignature spots DSers plumbing, from real warmlydecor data', () => {
+  expect(importerSignature({
+    variants: [{ sku: '35030427-china-1-sets-4pcs' }],
+    images: ['//cdn.shopify.com/s/files/1/0/products/product-image-1410527736.jpg?v=1601416180'],
+    vendor: 'Warmly',
+  })).toEqual(['dsers_sku', 'dsers_image']);
+});
+
+test('importerSignature finds nothing on a real brand, from real Misen data', () => {
+  // The measured near-miss: Misen passed the hash gate at 5-10 bits. No importer
+  // signature is what must keep it link-only.
+  expect(importerSignature({
+    variants: [{ sku: 'MSN-CS-8' }],
+    images: ['//cdn.shopify.com/s/files/1/0/files/Misen2-Web-PDP-GlassLid-PSCS-8_-Gallery-1.jpg'],
+    vendor: 'Misen',
+  })).toEqual([]);
+  expect(importerSignature({})).toEqual([]);
+});
+
+test('a number requires an importer signature; a link does not', () => {
+  const results = [{ productId: '1', price: '$18.24', currency: 'USD', title: 'Gold Cutlery Set' }];
+  const same = '1'.repeat(64);
+  const gate = buildGate(same, [{ item: results[0], hash: same }]);
+  const store = { price: 73.95, currency: 'USD', host: 'x.com', vendor: 'X', title: 'Cutlery Set' };
+
+  // Photo match, real markup, but no evidence of who copied whom -> no number.
+  const without = decide(store, results, gate);
+  expect(without.render).toBe('link-only');
+  expect(without.reasons).toContain('no_importer_signature');
+
+  // Same everything, plus DSers plumbing -> the number is defensible.
+  const withSig = decide({ ...store, importer: ['dsers_sku'] }, results, gate);
+  expect(withSig.render).toBe('full');
+  expect(withSig.reasons).toEqual([]);
 });

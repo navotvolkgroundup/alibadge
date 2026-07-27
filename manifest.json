@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AliBadge",
-  "version": "0.1.0",
-  "description": "Shows the AliExpress price of the product page you're looking at.",
+  "version": "0.2.0",
+  "description": "Finds the AliExpress listing a dropship store is reselling, and shows the markup.",
   "background": {
     "service_worker": "src/worker.js",
     "type": "module"
@@ -41,5 +41,14 @@
         "path": "rules.json"
       }
     ]
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }

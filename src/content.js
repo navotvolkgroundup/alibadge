@@ -189,10 +189,29 @@
     // ld+json brand.name is the fallback for non-Shopify-themed pages.
     const vendor = p.vendor || ldBrand() || '';
 
+    // Evidence of IMPORTING, from the JSON already in hand — no extra request. A hash
+    // proves two photos are identical but not who copied whom; this is what keeps a
+    // brand whose photography was lifted from being shown a percentage. Duplicated from
+    // lib.js because content scripts cannot import — kept to the same patterns.
+    const importer = [];
+    {
+      const skus = (p.variants || []).map((v) => String((v && v.sku) || ''));
+      const imgs = (p.images || []).map((i) => String((i && i.src) || i || ''));
+      if (skus.some((x) => /^\d{7,9}-/.test(x))) importer.push('dsers_sku');
+      if (imgs.some((x) => /product-image-\d+\./.test(x))) importer.push('dsers_image');
+      if (imgs.some((x) => /inspire-uplift-.*-\d{13}\./.test(x))) importer.push('inspireuplift');
+      if (String(vendor).trim().toLowerCase() === 'my store') importer.push('my_store_vendor');
+      if (skus.some((x) => /^[A-Z0-9]{10,}$/.test(x)) && imgs.some((x) => /\/[0-9a-f]{32}\./.test(x))) {
+        importer.push('cj_zendrop');
+      }
+    }
+    if (importer.length) log('importer signature:', importer.join(','));
+
     return {
       url: location.href,
       host: HOST,
       vendor,
+      importer,
       title: p.title || '',
       price: finalPrice,
       currency: finalCurrency,

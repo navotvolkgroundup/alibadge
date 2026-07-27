@@ -61,6 +61,41 @@ export function isAllowedImageUrl(raw, pageOrigin) {
 }
 
 // ---------------------------------------------------------------------------
+// Importer signature — evidence about WHO COPIED WHOM
+// ---------------------------------------------------------------------------
+
+// The hash gate proves two photographs are the same. It is symmetric, so it cannot say
+// whether the store lifted the supplier's photo or an AliExpress seller lifted the
+// brand's. MEASURED, and it nearly cost a false accusation: all four Misen carbon-steel
+// pans passed the gate at 5-10 bits and were stopped only by the price floor.
+//
+// This is the independent signal. Dropship importers write their own SKU and filename
+// shapes into the store, and those are evidence of IMPORTING — of direction:
+//   DSers      sku `35030427-china-1-sets-4pcs`, images `product-image-<digits>.jpg`
+//   CJ/Zendrop long alphanumeric SKUs with 32-hex image filenames, vendor "My Store"
+//   Inspire Uplift  `inspire-uplift-<slug>-<13 digits>.jpg`
+//
+// Measured across the 11-store labelled set: warmlydecor carries DSers signatures and
+// every legitimate brand carries none — including Misen. Requiring a signature before
+// showing a NUMBER keeps both measured true positives and closes the Misen hole.
+//
+// Computed from the product JSON the content script already fetched. No extra request.
+export function importerSignature({ variants = [], images = [], vendor = '' } = {}) {
+  const hits = [];
+  const skus = variants.map((v) => String((v && v.sku) || ''));
+  const imgs = images.map((i) => String((i && i.src) || i || ''));
+
+  if (skus.some((x) => /^\d{7,9}-/.test(x))) hits.push('dsers_sku');
+  if (imgs.some((x) => /product-image-\d+\./.test(x))) hits.push('dsers_image');
+  if (imgs.some((x) => /inspire-uplift-.*-\d{13}\./.test(x))) hits.push('inspireuplift');
+  if (String(vendor).trim().toLowerCase() === 'my store') hits.push('my_store_vendor');
+  if (skus.some((x) => /^[A-Z0-9]{10,}$/.test(x)) && imgs.some((x) => /\/[0-9a-f]{32}\./.test(x))) {
+    hits.push('cj_zendrop');
+  }
+  return hits;
+}
+
+// ---------------------------------------------------------------------------
 // Perceptual hash gate — "is this the SAME photograph, or just the same category?"
 // ---------------------------------------------------------------------------
 
@@ -252,6 +287,11 @@ export function decide(extraction, results, gate) {
   if (extraction.currency && winner.currency && extraction.currency !== winner.currency) {
     return { render: 'link-only', winner, reasons: ['currency_mismatch'] };
   }
+
+  // A number accuses. Requiring independent evidence of direction — see
+  // importerSignature() — is what stops a brand whose photos were lifted from being
+  // badged. Costs nothing on measured data: both true positives carry DSers signatures.
+  if (!(extraction.importer || []).length) reasons.push('no_importer_signature');
 
   const ratio = extraction.price / aliPrice;
   if (ratio < MIN_RATIO) reasons.push('below_ratio_floor');

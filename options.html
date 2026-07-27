@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>AliBadge</title>
+<!-- Opened automatically on install, BEFORE anything is uploaded. The extension sends
+     product photos from pages you visit to Alibaba infrastructure; doing that silently
+     is not defensible however useful the result is, so it is off until enabled here. -->
+<style>
+  :root { color-scheme: dark light; }
+  body {
+    margin: 0; padding: 40px 24px; display: flex; justify-content: center;
+    font: 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: #12100e; color: #f6f4f1;
+  }
+  main { max-width: 640px; width: 100%; }
+  h1 { font-size: 22px; letter-spacing: .02em; margin: 0 0 4px; }
+  .sub { color: #9b938b; margin: 0 0 32px; }
+  h2 { font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: #9b938b;
+       margin: 32px 0 10px; }
+  p, li { color: #d9d4ce; }
+  ul { padding-left: 20px; margin: 0; }
+  li { margin: 6px 0; }
+  code { color: #ff5a4d; }
+  .box { border: 1px solid #3a352f; background: #191614; border-radius: 10px; padding: 18px 20px; }
+  .consent { display: flex; gap: 14px; align-items: flex-start; cursor: pointer; }
+  .consent input { margin-top: 4px; width: 18px; height: 18px; accent-color: #ff5a4d; flex: none; }
+  .consent b { color: #f6f4f1; }
+  #state { margin-top: 14px; font-size: 13px; color: #9b938b; }
+  .warn { border-color: #6b3a34; }
+  a { color: #ff5a4d; }
+</style>
+<main>
+  <h1>AliBadge</h1>
+  <p class="sub">Finds the AliExpress listing a dropship store is reselling.</p>
+
+  <div class="box consent-box warn">
+    <label class="consent">
+      <input type="checkbox" id="consent">
+      <span>
+        <b>Enable price comparison.</b><br>
+        On a Shopify product page, AliBadge uploads that page's <b>product photo to
+        AliExpress</b> (Alibaba, China) to search for a visually identical listing.
+        Nothing is uploaded until you tick this.
+      </span>
+    </label>
+    <div id="state">checking…</div>
+  </div>
+
+  <h2>What gets sent, and where</h2>
+  <ul>
+    <li>The <b>product photo</b> of Shopify product pages you visit — to AliExpress.</li>
+    <li>Nothing else. No page text, no URLs, no browsing history, no identifiers.</li>
+    <li>There is <b>no AliBadge server.</b> Nothing is sent to the author. Results are
+      cached in your own browser for 7 days and never leave it.</li>
+    <li>Requests are anonymous. Sign-in is not used and no account is required.</li>
+  </ul>
+
+  <h2>What it will and will not tell you</h2>
+  <ul>
+    <li>A <b>number</b> appears only when the photo is a near-exact match <i>and</i> the
+      store carries importer plumbing (DSers or CJ SKU and filename shapes). Both must
+      hold, because a matching photo alone cannot say who copied whom.</li>
+    <li>Otherwise you get a <b>link</b> to the AliExpress search and no percentage.</li>
+    <li>Measured on a 40-product labelled set: <b>0 false positives</b> across 32
+      legitimate-brand products, <b>2 of 8</b> dropship products detected. It is silent
+      far more often than it speaks, deliberately.</li>
+    <li>It is <b>not</b> a counterfeit detector and not a judgement about any merchant.</li>
+  </ul>
+
+  <h2>Known limits</h2>
+  <ul>
+    <li>An AliExpress seller who steals a brand's photograph looks identical to a
+      dropshipper reusing a supplier's. The importer check exists to cover that, and it
+      is not perfect.</li>
+    <li>Markup excludes shipping, and uses the <b>dearest</b> variant of the matched
+      listing when available — the conservative end.</li>
+    <li>Ad blockers may block the marketplace image CDN. When images cannot be checked,
+      AliBadge stays silent rather than guessing.</li>
+  </ul>
+</main>
+<script src="options.js"></script>
