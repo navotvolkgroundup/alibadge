@@ -40,6 +40,7 @@ const scored = rows.map((r) => {
       ratio: r.aliPrice && r.aliCurrency === r.currency ? +(r.price / r.aliPrice).toFixed(2) : null,
       markup: r.markup ?? null,
       dearest: /dearest/.test(String(r.priceBasis || '')),
+      aliUrl: r.aliUrl || null,
       // "Comparable" = the pipeline got as far as an actual price-vs-price
       // comparison, which is the ONLY state in which the guards were exercised.
       // currency_mismatch belongs here, not with the passes: decide() refuses before
@@ -135,6 +136,29 @@ for (const r of scored.filter((x) => x.bucket !== 'dropship' && x.render !== 'fu
   for (const why of (r.reasons.length ? r.reasons : ['(rendered, no reason)'])) tally[why] = (tally[why] || 0) + 1;
 }
 for (const [k, v] of Object.entries(tally).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
+
+// Do distinct store products collapse onto ONE marketplace listing? Observed in the
+// first run: three warmlydecor cutlery sets and four petclever toys each matched a
+// single listing. That is either a genuine multi-variant supplier listing or a
+// category-level match, and the difference decides whether the markups mean anything.
+const byWinner = {};
+for (const r of scored.filter((x) => x.aliUrl)) {
+  (byWinner[r.aliUrl] ||= []).push(r);
+}
+const collapsed = Object.entries(byWinner).filter(([, rs]) => rs.length > 1);
+if (collapsed.length) {
+  console.log('\nWINNER COLLAPSE — one listing matched by several store products:');
+  for (const [url, rs] of collapsed.sort((a, b) => b[1].length - a[1].length)) {
+    console.log(`  ${rs.length}x  ${url}`);
+    for (const r of rs) console.log(`        ${String(r.render).padEnd(10)} ${r.ratio ? r.ratio + 'x' : '—'}  ${r.id}`);
+  }
+  const fullCollapsed = collapsed.flatMap(([, rs]) => rs).filter((r) => r.render === 'full').length;
+  const fullTotal = scored.filter((r) => r.render === 'full').length;
+  if (fullTotal) {
+    console.log(`  ${fullCollapsed}/${fullTotal} full badges rest on a shared winner` +
+      (fullCollapsed === fullTotal ? ' — EVERY one. Verify the match is the same product.' : ''));
+  }
+}
 
 // Whether the markups are measurements or upper bounds. All-bounds is not a failure,
 // but it is a different claim and the receipt wording depends on it.
