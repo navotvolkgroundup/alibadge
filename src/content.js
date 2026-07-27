@@ -18,7 +18,12 @@
   let generation = 0;
   let badge = null;
   let debug = true; // see worker.js — on by default for unpacked builds
-  chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false));
+  // Guarded like every other chrome.* call here: in an orphaned context these throw
+  // SYNCHRONOUSLY, and an unhandled throw at injection time kills the script before it
+  // can report anything.
+  try {
+    chrome.storage.local.get('alibadgeDebug').then((r) => (debug = r.alibadgeDebug !== false), () => {});
+  } catch {}
   const log = (...a) => debug && console.log('[alibadge]', ...a);
   // Unconditional: absence of this line in the PAGE console proves the content
   // script never injected, which is a completely different problem from a skip.
@@ -415,9 +420,11 @@
   let t = null;
   const schedule = () => { clearTimeout(t); t = setTimeout(run, 400); };
 
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg && msg.target === 'content' && msg.type === 'navigated') schedule();
-  });
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.target === 'content' && msg.type === 'navigated') schedule();
+    });
+  } catch {}
 
   // Backstop for quick-view / drawer PDPs that change no URL at all, and for
   // variant switches the worker's tabs.onUpdated may not surface.
