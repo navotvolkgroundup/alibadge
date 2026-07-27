@@ -8,7 +8,12 @@ import { decide, md5, parsePrice } from '../src/lib.js';
 // Either a file, or the JSON the worker logs when the POST is blocked:
 //   pbpaste | bun labelset/score.js -
 const src = process.argv[2] || 'labelset/harvest.json';
-const rows = JSON.parse(src === '-' ? await Bun.stdin.text() : await Bun.file(src).text());
+const text = src === '-' ? await Bun.stdin.text() : await Bun.file(src).text();
+// Accepts either a JSON array (the worker harness posts one) or JSONL (run.js writes
+// one row per line so a punish mid-run cannot corrupt the file).
+const rows = text.trimStart().startsWith('[')
+  ? JSON.parse(text)
+  : text.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
 
 // Reasons that mean no comparison happened, so nothing was tested. Distinguished
 // from a real gate decision (below_ratio_floor, ratio_implausible, brand guards,
@@ -34,6 +39,7 @@ const scored = rows.map((r) => {
       aliPrice: r.aliPrice ?? null, aliCur: r.aliCurrency ?? null, aliTitle: r.aliTitle ?? null,
       ratio: r.aliPrice && r.aliCurrency === r.currency ? +(r.price / r.aliPrice).toFixed(2) : null,
       markup: r.markup ?? null,
+      dearest: /dearest/.test(String(r.priceBasis || '')),
       // "Comparable" = the pipeline got as far as an actual price-vs-price
       // comparison, which is the ONLY state in which the guards were exercised.
       // currency_mismatch belongs here, not with the passes: decide() refuses before
@@ -129,6 +135,15 @@ for (const r of scored.filter((x) => x.bucket !== 'dropship' && x.render !== 'fu
   for (const why of (r.reasons.length ? r.reasons : ['(rendered, no reason)'])) tally[why] = (tally[why] || 0) + 1;
 }
 for (const [k, v] of Object.entries(tally).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(3)}  ${k}`);
+
+// Whether the markups are measurements or upper bounds. All-bounds is not a failure,
+// but it is a different claim and the receipt wording depends on it.
+const full = scored.filter((r) => r.render === 'full');
+if (full.length) {
+  const d = full.filter((r) => r.dearest).length;
+  console.log(`\ndearest-variant priced: ${d}/${full.length} full badges` +
+    (d < full.length ? ' — the rest are UPPER BOUNDS' : ''));
+}
 
 const notes = scored.filter((r) => r.note);
 console.log(`\ncaveats printed: ${notes.length}`);

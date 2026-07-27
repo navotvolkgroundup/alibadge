@@ -570,7 +570,7 @@ async function judge(extraction, found) {
 //
 // Goes through the same enqueue() and the same lookup() a real page does, so the
 // measurement grades shipped behaviour rather than a parallel implementation.
-self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest') => {
+self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harvest', fresh = true) => {
   // Default to the set BUNDLED WITH THE EXTENSION. Two runs produced nothing because
   // the very first line fetched http://127.0.0.1 — unguarded, so it threw before
   // logging anything, and a blocked private-network request looked exactly like
@@ -582,6 +582,14 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
   } catch (e) {
     console.error(`[labelset] could not load the set from ${url}: ${e}`);
     return null;
+  }
+  // A measurement must not answer from cache: entries predating the currency cookie
+  // hold ILS-priced candidates, and entries predating the pdp lookup carry no
+  // dearest-variant flag. Both would be scored as if they were current behaviour.
+  if (fresh) {
+    const keys = Object.keys(await chrome.storage.local.get(null)).filter((k) => k.startsWith('c:'));
+    await chrome.storage.local.remove(keys);
+    console.log(`[labelset] cleared ${keys.length} cache entries`);
   }
   console.log(`[labelset] ${items.length} items loaded from ${url}, starting`);
   const out = [];
@@ -603,6 +611,9 @@ self.__alibadgeLabelset = async (itemsUrl, postTo = 'http://127.0.0.1:8899/harve
       render: v.render, reasons: v.reasons || [], note: v.note || null,
       aliPrice: v.aliPrice ?? null, aliCurrency: v.aliCurrency ?? null,
       aliTitle: v.aliTitle ?? null, aliUrl: v.aliUrl ?? null, markup: v.markup ?? null,
+      // Whether the number is a measurement or an upper bound. From bun pdp is
+      // punished on every call, so a run out there can only ever produce bounds.
+      priceBasis: v.priceBasis ?? null,
     });
     console.log(`[labelset] ${n + 1}/${items.length} ${it.bucket} ${v.render} ` +
       `${(v.reasons || []).join(',')} ${it.id}`);
