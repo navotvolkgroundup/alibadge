@@ -1,0 +1,86 @@
+[
+  {
+    "id": "warmlydecor.com/matte-black-cutlery-set",
+    "bucket": "dropship",
+    "render": "full",
+    "distance": 0,
+    "match": "https://ae01.alicdn.com/kf/Haca7360efb544b348c6ca0f404e7fad4c.jpg"
+  },
+  {
+    "id": "warmlydecor.com/modern-30-piece-cutlery-set",
+    "bucket": "dropship",
+    "render": "full",
+    "distance": 31,
+    "match": "https://ae01.alicdn.com/kf/H77af7ac614104a5ea95530feeee353e9U.jpg"
+  },
+  {
+    "id": "warmlydecor.com/caleb-modern-cutlery-set",
+    "bucket": "dropship",
+    "render": "full",
+    "distance": 36,
+    "match": "https://ae01.alicdn.com/kf/Haca7360efb544b348c6ca0f404e7fad4c.jpg"
+  },
+  {
+    "id": "petclever.net/7-in-1-usb-cat-laser-toy",
+    "bucket": "dropship",
+    "render": "link-only",
+    "distance": 3,
+    "match": "https://ae01.alicdn.com/kf/Se3a62c3e70104e9aa72eaa9b046d7956I.jpg"
+  },
+  {
+    "id": "petclever.net/interactive-7-in-1",
+    "bucket": "dropship",
+    "render": "link-only",
+    "distance": 3,
+    "match": "https://ae01.alicdn.com/kf/Se3a62c3e70104e9aa72eaa9b046d7956I.jpg"
+  },
+  {
+    "id": "petclever.net/pacifier-shape-dog-teething-chew-toy",
+    "bucket": "dropship",
+    "render": "link-only",
+    "distance": 32,
+    "match": "https://ae01.alicdn.com/kf/Sf997b4336c654502a1bd31f9f2e15c066.jpg"
+  },
+  {
+    "id": "petclever.net/funny-devils-mouth-squeaky-toy",
+    "bucket": "dropship",
+    "render": "link-only",
+    "distance": 30,
+    "match": "https://ae01.alicdn.com/kf/Se3a62c3e70104e9aa72eaa9b046d7956I.jpg"
+  },
+  {
+    "id": "deathwishcoffee.com/sidekick-cocktail-shaker",
+    "bucket": "easy_neg",
+    "render": "link-only",
+    "distance": 26,
+    "match": "https://ae01.alicdn.com/kf/S03e7de74637e4d8e82487891097508d3S.jpg"
+  },
+  {
+    "id": "www.spigen.com/galaxy-watch-9-series-thin-fit-360",
+    "bucket": "hard_neg",
+    "render": "full",
+    "distance": 28,
+    "match": "https://ae01.alicdn.com/kf/S856fe1216e294c4ca0db777fb5311a05x.jpg"
+  },
+  {
+    "id": "www.spigen.com/galaxy-watch-9-series-wbf1",
+    "bucket": "hard_neg",
+    "render": "full",
+    "distance": 33,
+    "match": "https://ae01.alicdn.com/kf/S1c284f1f997c48599b7ef2bdd84860848.jpg"
+  },
+  {
+    "id": "www.spigen.com/galaxy-watch-9-series-modern-fit-316l-band",
+    "bucket": "hard_neg",
+    "render": "full",
+    "distance": 32,
+    "match": "https://ae01.alicdn.com/kf/S1c284f1f997c48599b7ef2bdd84860848.jpg"
+  },
+  {
+    "id": "www.spigen.com/galaxy-watch-9-series-bezel-tune-pro",
+    "bucket": "hard_neg",
+    "render": "full",
+    "distance": 33,
+    "match": "https://ae01.alicdn.com/kf/S1c284f1f997c48599b7ef2bdd84860848.jpg"
+  }
+]

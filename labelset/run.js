@@ -224,6 +224,9 @@ for (const [n, item] of batch.entries()) {
     rec.aliPrice = v.winner ? parsePrice(v.winner.price) : null;
     rec.aliCurrency = v.winner ? v.winner.currency : null;
     rec.aliTitle = v.winner ? v.winner.title : null;
+    // Both image URLs, so the perceptual-hash separation test runs offline.
+    rec.storeImage = item.image;
+    rec.aliImage = v.winner ? v.winner.image : null;
     rec.markup = rec.aliPrice ? Math.round(((item.price - rec.aliPrice) / rec.aliPrice) * 100) : null;
     rec.ratio = rec.aliPrice ? +(item.price / rec.aliPrice).toFixed(2) : null;
     rec.n = r.items.length;
