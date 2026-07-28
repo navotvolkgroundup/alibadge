@@ -55,14 +55,19 @@ const hourStamps = [];
 function enqueue(fn) {
   const run = chain.then(async () => {
     const now = Date.now();
-    hourStamps.splice(0, hourStamps.findIndex((t) => now - t < 3600e3) + 1 || 0);
-    if (hourStamps.filter((t) => now - t < 3600e3).length >= HOURLY_CAP) {
+    // ONE source of truth. This used to prune with a splice and then count with a
+    // separate filter, and the splice deleted a live timestamp every call — so the array
+    // never passed length 1 and this cap never fired once. See liveWithin() in lib.js.
+    const live = liveWithin(hourStamps, now);
+    if (live.length >= HOURLY_CAP) {
+      log(`rate capped: ${live.length} calls in the last hour`);
       return { render: 'none', reasons: ['rate_capped'] };
     }
     const wait = Math.max(0, MIN_GAP_MS - (now - lastStart));
     if (wait) await new Promise((r) => setTimeout(r, wait));
     lastStart = Date.now();
-    hourStamps.push(lastStart);
+    hourStamps.length = 0;
+    hourStamps.push(...live, lastStart);
     return fn();
   });
   chain = run.catch(() => {});

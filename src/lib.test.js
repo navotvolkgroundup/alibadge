@@ -494,3 +494,13 @@ test('the hourly cap actually engages — the symptom, not just the helper', () 
   expect(stamps.length).toBe(CAP);
   expect(capped).toBe(200 - CAP);
 });
+
+test('worker.js actually USES liveWithin — the helper existing is not the fix', () => {
+  // I shipped a commit titled "fix the hourly rate cap" that did not fix it: the edit
+  // targeted a pattern that only existed on a branch, so it silently matched nothing.
+  // liveWithin() and its tests landed, the caller kept the broken splice, and every
+  // test still passed. A pure helper proves nothing about the code path that calls it.
+  const src = require('node:fs').readFileSync(new URL('./worker.js', import.meta.url), 'utf8');
+  expect(src).toContain('liveWithin(hourStamps, now)');
+  expect(src).not.toContain('hourStamps.splice(');
+});
