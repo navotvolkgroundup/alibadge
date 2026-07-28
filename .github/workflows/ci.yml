@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Unit tests
+        run: bun test src
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: E2E tests
+        run: bunx playwright test
+
+  version-bump:
+    name: Version bump check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      - name: Check if extension code changed
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only origin/main...HEAD -- manifest.json 'src/*.js' ':!src/*.test.js' options.html options.js rules.json icons/)
+          echo "changed=$CHANGED"
+          if [ -z "$CHANGED" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compare manifest.json version to main
+        if: steps.changes.outputs.skip == 'false'
+        run: |
+          BASE_VERSION=$(git show origin/main:manifest.json | jq -r .version)
+          HEAD_VERSION=$(jq -r .version manifest.json)
+          echo "main: $BASE_VERSION, PR: $HEAD_VERSION"
+
+          if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+            echo "::error::manifest.json version was not bumped (still $HEAD_VERSION)."
+            exit 1
+          fi
+
+          HIGHER=$(printf '%s\n%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | tail -n1)
+          if [ "$HIGHER" != "$HEAD_VERSION" ]; then
+            echo "::error::manifest.json version ($HEAD_VERSION) is not higher than main ($BASE_VERSION)."
+            exit 1
+          fi
