@@ -61,6 +61,27 @@ export function isAllowedImageUrl(raw, pageOrigin) {
 }
 
 // ---------------------------------------------------------------------------
+// Rate-limit window
+// ---------------------------------------------------------------------------
+
+export const HOUR_MS = 3600e3;
+
+// The timestamps still inside the window. Pure, so the hourly cap can actually be
+// tested — it could not be before, and it never fired.
+//
+// The bug it replaces: enqueue() pruned with
+//   hourStamps.splice(0, hourStamps.findIndex((t) => now - t < HOUR) + 1 || 0)
+// and then counted with a separate filter. `findIndex` returns the first LIVE index, so
+// `+ 1` deleted that live stamp too. With traffic inside the window that is index 0
+// every time, so each call deleted the one stamp it had just kept: the array never grew
+// past length 1 and HOURLY_CAP never triggered once. Two bookkeeping paths — a prune and
+// a filter — are what let it hide, so now there is one.
+export function liveWithin(stamps, now, windowMs = HOUR_MS) {
+  if (!Array.isArray(stamps)) return [];
+  return stamps.filter((t) => Number.isFinite(t) && now - t < windowMs);
+}
+
+// ---------------------------------------------------------------------------
 // Importer signature — evidence about WHO COPIED WHOM
 // ---------------------------------------------------------------------------
 

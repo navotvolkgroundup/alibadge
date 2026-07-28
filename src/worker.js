@@ -6,7 +6,7 @@
 // do this, but an extension worker can.
 import {
   decide, isAllowedImageUrl, urlCacheKey, md5, markupPercent, parsePrice, dearestFromSkuMap,
-  buildGate, stripAlicdnSize, HASH_MAX_DISTANCE,
+  buildGate, stripAlicdnSize, HASH_MAX_DISTANCE, liveWithin,
 } from './lib.js';
 
 const UPLOAD_HOST = 'https://recom-acs.aliexpress.com'; // no MTOP handshake needed

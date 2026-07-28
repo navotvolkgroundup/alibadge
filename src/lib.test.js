@@ -8,6 +8,7 @@ import {
   MIN_RATIO, MAX_RATIO, MAX_RATIO_APPLIES_ABOVE,
   vendorMismatch, knownBrandIn, dearestFromSkuMap,
   hamming, stripAlicdnSize, buildGate, HASH_MAX_DISTANCE, importerSignature,
+  liveWithin, HOUR_MS,
 } from './lib.js';
 
 // --- price parsing -----------------------------------------------------------
@@ -456,4 +457,40 @@ test('a number requires an importer signature; a link does not', () => {
   const withSig = decide({ ...store, importer: ['dsers_sku'] }, results, gate);
   expect(withSig.render).toBe('full');
   expect(withSig.reasons).toEqual([]);
+});
+
+// --- rate-limit window -------------------------------------------------------
+
+test('liveWithin keeps everything inside the window', () => {
+  // THE BUG: the old prune deleted the first live stamp every call, so with steady
+  // traffic the array never grew past length 1 and HOURLY_CAP never fired once.
+  const now = 1_000_000;
+  const stamps = [now - 10, now - 20, now - 30];
+  expect(liveWithin(stamps, now)).toEqual(stamps);
+});
+
+test('liveWithin drops only what has aged out', () => {
+  const now = 10 * HOUR_MS;
+  const stale = now - HOUR_MS - 1;
+  const fresh = now - 5;
+  expect(liveWithin([stale, fresh], now)).toEqual([fresh]);
+  expect(liveWithin([stale, stale], now)).toEqual([]);
+  // Junk in, empty out, rather than NaN arithmetic silently disabling the cap.
+  expect(liveWithin([NaN, undefined, fresh], now)).toEqual([fresh]);
+  expect(liveWithin(null, now)).toEqual([]);
+});
+
+test('the hourly cap actually engages — the symptom, not just the helper', () => {
+  // Replay enqueue's bookkeeping over 200 calls 4s apart, all inside the hour.
+  const CAP = 120;
+  let now = 1_000_000, capped = 0;
+  let stamps = [];
+  for (let i = 0; i < 200; i++) {
+    now += 4000;
+    const live = liveWithin(stamps, now);
+    if (live.length >= CAP) { capped++; continue; }
+    stamps = [...live, now];
+  }
+  expect(stamps.length).toBe(CAP);
+  expect(capped).toBe(200 - CAP);
 });

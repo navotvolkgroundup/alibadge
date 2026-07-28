@@ -168,6 +168,13 @@ with prices and sold counts.
   that no longer existed. `onInstalled` stamps `updatedAt`; a content script injected
   before that warns and disables the receipt button. **Reload the PAGE, not just the
   extension.**
+- **One source of truth for the rate window.** `enqueue()` used to prune `hourStamps`
+  with a splice AND count with a separate filter, and the splice deleted a live timestamp
+  every call (`findIndex` returns the first LIVE index; `+ 1` took it out). With steady
+  traffic that is index 0 every time, so the array never passed length 1 and
+  `HOURLY_CAP = 120` **never fired once**. Two bookkeeping paths are what let it hide.
+  `liveWithin()` in lib.js is now the only one, and it is unit-tested including the
+  symptom. Found by @ekrako while writing tests for code that had none.
 - **Don't add the `tabs` permission.** `changeInfo.url` is populated already because
   `host_permissions` covers the tab.
 - **Don't patch `history.pushState` from the content script.** The isolated world has its
