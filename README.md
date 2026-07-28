@@ -10,13 +10,20 @@ would have published. A tool that prints an accusation should show its error rat
 
 ## Install
 
-`./build.sh` produces `dist/alibadge-<version>.zip` — tests first, then a bundle carrying
-only what the extension runs (no tests, no `labelset/`, which holds measurement records).
+**Not a developer?** → **[INSTALL.md](INSTALL.md)** walks through it step by step, about two
+minutes, no terminal. Download the zip from
+[the latest release](https://github.com/navotvolkgroundup/alibadge/releases/latest).
 
-1. `chrome://extensions` → enable Developer mode
-2. **Load unpacked** → select this directory (or unzip the bundle and select that)
-3. The options page opens. **Nothing is uploaded until you enable it there.**
-4. Visit a Shopify product page (try `warmlydecor.com/products/caleb-modern-cutlery-set`)
+Developers: `chrome://extensions` → Developer mode → **Load unpacked** → this directory.
+The options page opens; **nothing is uploaded until you enable it there.** Then visit
+`warmlydecor.com/products/caleb-modern-cutlery-set`.
+
+`./build.sh` runs both suites and produces `dist/alibadge-<version>.zip` — only what the
+extension runs, no tests and no `labelset/`.
+
+**It is silent on most pages by design.** Measured on 40 products it showed a number on 2
+of them. That is the point, not a fault: a percentage is close to an accusation, so it
+requires a near-exact photo match AND importer fingerprints in the store.
 
 ## Two independent things must hold before a NUMBER appears
 
