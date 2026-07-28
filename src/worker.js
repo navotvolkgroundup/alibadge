@@ -21,10 +21,10 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // Bump to invalidate every existing entry. Entries now hold search RESULTS, not
 // verdicts, so this only needs bumping when the result SHAPE changes — never for a
 // change to decide().
-const CACHE_V = 'v4';  // v4: results carry a hash distance `d`; v3 entries had no gate
-const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
-const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
-const HOURLY_CAP = 120;
+export const CACHE_V = 'v4';  // v4: results carry a hash distance `d`; v3 entries had no gate
+export const CACHE_MAX = 500;     // chrome.storage.local has no LRU and a 10MB quota
+export const MIN_GAP_MS = 4000;   // token bucket: concurrency 1 bounds simultaneity, not rate
+export const HOURLY_CAP = 120;
 
 // Default ON: silence is this extension's normal state, so a load-unpacked build
 // with logging off is indistinguishable from a broken one. Opt out explicitly.
@@ -52,7 +52,7 @@ let chain = Promise.resolve();
 let lastStart = 0;
 const hourStamps = [];
 
-function enqueue(fn) {
+export function enqueue(fn) {
   const run = chain.then(async () => {
     const now = Date.now();
     // ONE source of truth. This used to prune with a splice and then count with a
@@ -83,7 +83,7 @@ async function sha256(buf) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function cacheGet(keys) {
+export async function cacheGet(keys) {
   const got = await chrome.storage.local.get(keys.map((k) => `c:${CACHE_V}:${k}`));
   for (const k of keys) {
     const hit = got[`c:${CACHE_V}:${k}`];
@@ -92,7 +92,7 @@ async function cacheGet(keys) {
   return null;
 }
 
-async function cachePut(keys, v) {
+export async function cachePut(keys, v) {
   const rec = { t: Date.now(), v };
   const put = {};
   for (const k of keys) put[`c:${CACHE_V}:${k}`] = rec;
@@ -114,7 +114,7 @@ async function cachePut(keys, v) {
 // the token is the part before the "_". `recom-acs` does NOT skip this — verified
 // against a live call, contrary to an earlier note in the design doc. Reading the
 // cookie is why the `cookies` permission is required after all.
-async function tokenFor(host) {
+export async function tokenFor(host) {
   try {
     const c = await chrome.cookies.get({ url: host, name: '_m_h5_tk' });
     return c && c.value ? c.value.split('_')[0] : null;
@@ -140,7 +140,7 @@ async function mtopCall(data, token) {
   return res.json().catch(() => null);
 }
 
-async function uploadImage(b64, currency) {
+export async function uploadImage(b64, currency) {
   const params = {
     appId: UPLOAD_APPID,
     isNewImageSearch: true,
@@ -191,7 +191,7 @@ async function uploadImage(b64, currency) {
 // and fixes every candidate at once.
 //
 // region stays US to match the pinned shpt_co, which the receipt discloses.
-const AEP_COOKIE = 'aep_usuc_f';
+export const AEP_COOKIE = 'aep_usuc_f';
 
 // --- AliExpress: the winner's DEAREST variant --------------------------------
 // The results payload carries only salePrice.minPrice — dumped across 60 items, there
@@ -228,7 +228,7 @@ async function pdpCall(data, token) {
 // MEASURED from inside the extension: SUCCESS, ~74KB, and no handshake needed because
 // the cookie is already present. The bun-side FAIL_SYS_USER_VALIDATE was about the
 // client, not the endpoint.
-function findKey(o, name, d = 0) {
+export function findKey(o, name, d = 0) {
   if (!o || typeof o !== 'object' || d > 8) return null;
   if (o[name]) return o[name];
   for (const v of Object.values(o)) {
@@ -238,7 +238,7 @@ function findKey(o, name, d = 0) {
   return null;
 }
 
-async function pdpDearest(productId, currency) {
+export async function pdpDearest(productId, currency) {
   const data = JSON.stringify({
     productId: String(productId), _currency: currency || CURRENCY,
     country: SHIP_TO, locale: 'en_US', pdp_ext_f: '{}',
@@ -320,7 +320,7 @@ self.__alibadgePdp = async (productId, currency = 'USD') => {
 
 // The cookie is the USER's — it drives the currency they see on aliexpress.com. Set
 // it for the search, then put back exactly what was there, including absent.
-async function withStoreCurrency(currency, fn) {
+export async function withStoreCurrency(currency, fn) {
   const url = RESULTS_LOCALE + '/';
   let prior = null;
   try {
@@ -344,7 +344,7 @@ async function withStoreCurrency(currency, fn) {
   }
 }
 
-async function fetchResults(fileId, attempt = 1) {
+export async function fetchResults(fileId, attempt = 1) {
   const res = await fetch(`${RESULTS_LOCALE}/fn/search-pc/index`, {
     method: 'POST',
     // include, NOT omit: the currency comes from the aep_usuc_f cookie set by
@@ -426,9 +426,9 @@ function toBase64(buf) {
 // keeping while it fits: the design doc's warning was about the 8KB jsonp cap wrecking
 // match quality, and 1200px is nowhere near that.
 const UPLOAD_MAX_PX = 1200;
-const UPLOAD_MAX_BYTES = 400 * 1024;
+export const UPLOAD_MAX_BYTES = 400 * 1024;
 
-async function encodeForUpload(buf) {
+export async function encodeForUpload(buf) {
   if (buf.byteLength <= UPLOAD_MAX_BYTES) return { b64: toBase64(buf), resized: false };
   try {
     const bmp = await createImageBitmap(new Blob([buf]));
@@ -452,7 +452,7 @@ async function encodeForUpload(buf) {
 
 // dHash: 9x8 greyscale, one bit per horizontal gradient. Scale- and re-encode-invariant,
 // which is exactly what a store does to a supplier photo before publishing it.
-async function dhashOf(blobOrBuf) {
+export async function dhashOf(blobOrBuf) {
   try {
     const bmp = await createImageBitmap(blobOrBuf instanceof Blob ? blobOrBuf : new Blob([blobOrBuf]));
     const c = new OffscreenCanvas(9, 8);
@@ -486,7 +486,7 @@ async function dhashOf(blobOrBuf) {
 // much — but it costs little and it is the only recall lever that adds no risk.
 const GATE_CANDIDATES = 16;
 
-async function gateFor(storeBuf, results) {
+export async function gateFor(storeBuf, results) {
   const storeHash = await dhashOf(storeBuf);
   if (!storeHash) return null;
   const head = results.slice(0, GATE_CANDIDATES);
@@ -522,7 +522,7 @@ async function gateFor(storeBuf, results) {
   return gate;
 }
 
-async function thumb(url, px = 260) {
+export async function thumb(url, px = 260) {
   if (!url) return null;
   try {
     const res = await fetch(url, { credentials: 'omit' });
@@ -542,7 +542,7 @@ async function thumb(url, px = 260) {
 
 // --- pipeline ----------------------------------------------------------------
 
-async function lookup(extraction, pageOrigin) {
+export async function lookup(extraction, pageOrigin) {
   // Nothing leaves the browser before the user has agreed to it. This extension uploads
   // the product photo of every page it runs on to Alibaba infrastructure, and doing that
   // silently on someone else's browsing is not defensible however useful the result is.
@@ -664,7 +664,7 @@ async function lookup(extraction, pageOrigin) {
 // closest gallery image is 21 bits away. The gate was correct and simply absent.
 //
 // So no distance means no pass. The gate is mandatory, and its absence is silence.
-function gateFromStored(results) {
+export function gateFromStored(results) {
   return results.map((item) => ({
     item,
     distance: item.d == null ? Infinity : item.d,
@@ -672,7 +672,7 @@ function gateFromStored(results) {
   }));
 }
 
-async function judge(extraction, found) {
+export async function judge(extraction, found) {
   const { fileId, results } = found;
 
   // The gate rank alone could not provide. MEASURED: ungated, the labelled run produced
