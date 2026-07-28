@@ -861,14 +861,13 @@ describe('the tabs.onUpdated listener', () => {
 // already pushed through the same queue: that calls run one at a time, in order, and
 // that one throwing call does not wedge the ones behind it.
 //
-// NOTE: the HOURLY_CAP enforcement itself (`hourStamps.filter(...).length >= HOURLY_CAP`)
-// was deliberately NOT asserted here. Reproducing it isolated from the rest of enqueue()
-// shows the prune line (`hourStamps.splice(0, hourStamps.findIndex(...) + 1 || 0)`)
-// discards one live timestamp on every call whenever the oldest entry is still within
-// the window — which is the entire first hour of any real run — so hourStamps never
-// grows past 1 and the cap is never actually reached. That looks like a pre-existing
-// bug in the prune arithmetic; fixing it is out of scope for adding tests, so it is
-// flagged here rather than asserted as if it were working.
+// The cap was unassertable when this file was written: the prune line
+// (`hourStamps.splice(0, hourStamps.findIndex(...) + 1 || 0)`) discarded one LIVE
+// timestamp per call, because findIndex returns the first live index and `+ 1` took it
+// with the stale ones. Under steady traffic that is index 0 every time, so the array
+// never passed length 1 and HOURLY_CAP was unreachable. Flagged in review, fixed in
+// 3fbdba0 — `liveWithin()` in lib.js is now the single source of truth — so the cap is
+// asserted below.
 
 describe('enqueue', () => {
   test('runs queued calls one at a time, in submission order', async () => {
@@ -886,6 +885,41 @@ describe('enqueue', () => {
     } finally {
       globalThis.setTimeout = realTimeout;
     }
+  });
+
+  test('HOURLY_CAP actually stops calls once the window is full', async () => {
+    // hourStamps is module-level and shared across this whole file, with no reset hook.
+    // Rather than draining the real bucket (which would rate-cap every later test), pin
+    // Date.now to a fixed point far in the future: every stamp left by earlier tests is
+    // then older than the window, liveWithin() drops them all, and the count starts at 0
+    // under our control.
+    const realNow = Date.now;
+    const realTimeout = globalThis.setTimeout;
+    const T = realNow() + 500 * 3600e3;
+    globalThis.setTimeout = (fn) => { fn(); return 0; };
+    Date.now = () => T;
+    try {
+      // Fill the window exactly to the cap. Each of these must run.
+      for (let i = 0; i < w.HOURLY_CAP; i++) {
+        expect(await w.enqueue(async () => 'ran')).toBe('ran');
+      }
+      // The next one must be refused, and refused for the named reason — not merely
+      // return something falsy.
+      const capped = await w.enqueue(async () => 'should not run');
+      expect(capped).toEqual({ render: 'none', reasons: ['rate_capped'] });
+
+      // Still capped while the window holds.
+      expect((await w.enqueue(async () => 'nope')).reasons).toEqual(['rate_capped']);
+
+      // And it recovers: move past the window and the same call goes through.
+      Date.now = () => T + 3600e3 + 1;
+      expect(await w.enqueue(async () => 'ran again')).toBe('ran again');
+    } finally {
+      Date.now = realNow;
+      globalThis.setTimeout = realTimeout;
+    }
+    // Leaves one stamp dated in the future, which liveWithin counts as live. Harmless:
+    // one entry against a cap of 120, and every later test still runs.
   });
 
   test('a call that throws does not break the queue for the calls behind it', async () => {
