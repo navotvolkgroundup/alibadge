@@ -3,3 +3,7 @@ node_modules/
 test-results/
 playwright-report/
 bun.lock
+_metadata/
+dist/
+test-results/
+playwright-report/

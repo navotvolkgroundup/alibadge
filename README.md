@@ -3,7 +3,10 @@
 Chrome extension. On a Shopify product page, shows the AliExpress price of the same
 product and the markup — without being asked.
 
-Design doc: `~/.gstack/projects/navotvolkgroundup-nabot/navotv-main-design-20260725-141510.md`
+MIT licensed. The measured results in `labelset/` are part of the repository on purpose:
+they name the stores and brands the tool got RIGHT and the ones it got WRONG, including
+four false accusations against Spigen and four against OtterBox that the first version
+would have published. A tool that prints an accusation should show its error rate.
 
 ## Install
 
